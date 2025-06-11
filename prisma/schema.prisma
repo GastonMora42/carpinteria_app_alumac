@@ -1,0 +1,197 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String         @id @default(uuid())
+  email          String         @unique
+  name           String
+  role           Role           @default(USER)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  lastLoginAt    DateTime?
+  presupuestos   Presupuesto[]
+  pedidos        Pedido[]
+  transacciones  Transaccion[]
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}
+
+model Cliente {
+  id            String         @id @default(uuid())
+  nombre        String
+  email         String?
+  telefono      String?
+  direccion     String?
+  notas         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  presupuestos  Presupuesto[]
+  pedidos       Pedido[]
+  transacciones Transaccion[]
+}
+
+model Proveedor {
+  id            String          @id @default(uuid())
+  nombre        String
+  email         String?
+  telefono      String?
+  direccion     String?
+  notas         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  materiales    Material[]
+  transacciones Transaccion[]
+}
+
+model Material {
+  id              String            @id @default(uuid())
+  codigo          String            @unique
+  nombre          String
+  descripcion     String?
+  tipo            TipoMaterial
+  unidadMedida    String
+  precioUnitario  Decimal           @db.Decimal(10, 2)
+  moneda          Moneda            @default(PESOS)
+  stockActual     Decimal           @db.Decimal(10, 2)
+  stockMinimo     Decimal           @db.Decimal(10, 2)
+  proveedorId     String
+  proveedor       Proveedor         @relation(fields: [proveedorId], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  materialPedido  MaterialPedido[]
+}
+
+enum TipoMaterial {
+  PERFIL
+  VIDRIO
+  ACCESORIO
+  OTRO
+}
+
+enum Moneda {
+  PESOS
+  DOLARES
+}
+
+model Presupuesto {
+  id            String          @id @default(uuid())
+  numero        String          @unique
+  clienteId     String
+  cliente       Cliente         @relation(fields: [clienteId], references: [id])
+  fechaEmision  DateTime        @default(now())
+  fechaValidez  DateTime
+  estado        EstadoPresupuesto @default(PENDIENTE)
+  total         Decimal         @db.Decimal(10, 2)
+  moneda        Moneda          @default(PESOS)
+  descuento     Decimal?        @db.Decimal(10, 2)
+  notas         String?
+  userId        String
+  user          User            @relation(fields: [userId], references: [id])
+  pedido        Pedido?
+  items         ItemPresupuesto[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+enum EstadoPresupuesto {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  VENCIDO
+  CONVERTIDO
+}
+
+model ItemPresupuesto {
+  id            String      @id @default(uuid())
+  presupuestoId String
+  presupuesto   Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
+  descripcion   String
+  cantidad      Int
+  precioUnitario Decimal    @db.Decimal(10, 2)
+  precioTotal   Decimal     @db.Decimal(10, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Pedido {
+  id                String          @id @default(uuid())
+  numero            String          @unique
+  clienteId         String
+  cliente           Cliente         @relation(fields: [clienteId], references: [id])
+  presupuestoId     String?         @unique
+  presupuesto       Presupuesto?    @relation(fields: [presupuestoId], references: [id])
+  fechaPedido       DateTime        @default(now())
+  fechaEntrega      DateTime?
+  estado            EstadoPedido    @default(PENDIENTE)
+  total             Decimal         @db.Decimal(10, 2)
+  moneda            Moneda          @default(PESOS)
+  notas             String?
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  materiales        MaterialPedido[]
+  transacciones     Transaccion[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+enum EstadoPedido {
+  PENDIENTE
+  EN_PROCESO
+  LISTO
+  ENTREGADO
+  CANCELADO
+}
+
+model MaterialPedido {
+  id            String      @id @default(uuid())
+  pedidoId      String
+  pedido        Pedido      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  materialId    String
+  material      Material    @relation(fields: [materialId], references: [id])
+  cantidad      Decimal     @db.Decimal(10, 2)
+  precioUnitario Decimal    @db.Decimal(10, 2)
+  precioTotal   Decimal     @db.Decimal(10, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Transaccion {
+  id            String           @id @default(uuid())
+  tipo          TipoTransaccion
+  monto         Decimal          @db.Decimal(10, 2)
+  moneda        Moneda           @default(PESOS)
+  fecha         DateTime         @default(now())
+  descripcion   String?
+  clienteId     String?
+  cliente       Cliente?         @relation(fields: [clienteId], references: [id])
+  proveedorId   String?
+  proveedor     Proveedor?       @relation(fields: [proveedorId], references: [id])
+  pedidoId      String?
+  pedido        Pedido?          @relation(fields: [pedidoId], references: [id])
+  userId        String
+  user          User             @relation(fields: [userId], references: [id])
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+enum TipoTransaccion {
+  INGRESO
+  EGRESO
+  ANTICIPO
+  PAGO_CLIENTE
+  PAGO_PROVEEDOR
+  OTRO
+}
