@@ -1,10 +1,13 @@
 // ===================================
 
 // src/hooks/use-ventas.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { VentaFormData } from '@/lib/validations/venta';
 
 interface Venta {
+  avance: ReactNode;
+  porcentajeAvance: any;
+  fechaEntregaReal: any;
   id: string;
   numero: string;
   cliente: {

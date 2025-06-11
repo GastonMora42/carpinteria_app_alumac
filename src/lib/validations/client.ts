@@ -1,4 +1,4 @@
-// src/lib/validations/client.ts
+// src/lib/validations/client.ts - Corrección del import
 import { z } from 'zod';
 
 export const clienteSchema = z.object({

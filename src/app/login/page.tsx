@@ -1,4 +1,6 @@
-// src/app/login/page.tsx
+// ===================================
+
+// src/app/login/page.tsx - Corrección completa
 'use client';
 
 import { useState } from 'react';
@@ -9,34 +11,44 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle } from 'react-icons/hi';
-import { ZodObject, ZodString, ZodTypeAny } from 'zod';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('from') || '/dashboard';
   
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: ''
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
+  const handleChange = (field: keyof LoginFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Limpiar errores al escribir
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    if (error) setError(null);
+  };
 
-  const onSubmit = async (data: LoginFormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setFieldErrors({});
 
     try {
+      // Validar con Zod
+      const validatedData = loginSchema.parse(formData);
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(validatedData),
       });
 
       const result = await response.json();
@@ -53,9 +65,20 @@ export default function LoginPage() {
       
       // Redireccionar
       router.push(redirectUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error de login:', error);
-      setError(error instanceof Error ? error.message : 'Error al iniciar sesión');
+      if (error.errors) {
+        // Errores de validación de Zod
+        const errors: Record<string, string> = {};
+        error.errors.forEach((err: any) => {
+          if (err.path?.[0]) {
+            errors[err.path[0]] = err.message;
+          }
+        });
+        setFieldErrors(errors);
+      } else {
+        setError(error.message || 'Error al iniciar sesión');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -94,15 +117,16 @@ export default function LoginPage() {
               </div>
             )}
 
-            <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <Input
                   label="Email"
                   type="email"
                   autoComplete="email"
                   placeholder="admin@alumgestion.com"
-                  error={errors.email?.message}
-                  {...register('email')}
+                  value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  error={fieldErrors.email}
                 />
               </div>
 
@@ -112,8 +136,9 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  error={errors.password?.message}
-                  {...register('password')}
+                  value={formData.password}
+                  onChange={(e) => handleChange('password', e.target.value)}
+                  error={fieldErrors.password}
                 />
                 <button
                   type="button"
@@ -175,13 +200,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-}
-
-function useForm<T>(arg0: { resolver: any; }): { register: any; handleSubmit: any; formState: { errors: any; }; } {
-  throw new Error('Function not implemented.');
-}
-
-
-function zodResolver(loginSchema: ZodObject<{ email: ZodString; password: ZodString; }, "strip", ZodTypeAny, { email: string; password: string; }, { email: string; password: string; }>) {
-  throw new Error('Function not implemented.');
 }
