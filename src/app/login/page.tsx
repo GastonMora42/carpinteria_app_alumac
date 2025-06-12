@@ -1,4 +1,4 @@
-// src/app/login/page.tsx
+// src/app/login/page.tsx - MEJORADO
 'use client';
 
 import { useState } from 'react';
@@ -8,7 +8,7 @@ import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle } from 'react-icons/hi';
+import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle, HiOutlineInformationCircle } from 'react-icons/hi';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   const handleChange = (field: keyof LoginFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -31,7 +32,10 @@ export default function LoginPage() {
     if (fieldErrors[field]) {
       setFieldErrors(prev => ({ ...prev, [field]: '' }));
     }
-    if (error) setError(null);
+    if (error) {
+      setError(null);
+      setNeedsConfirmation(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,6 +43,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     setFieldErrors({});
+    setNeedsConfirmation(false);
 
     try {
       // Validar con Zod
@@ -53,14 +58,33 @@ export default function LoginPage() {
       const result = await response.json();
 
       if (!response.ok) {
+        // Manejar casos específicos
+        if (response.status === 409) {
+          // Usuario no confirmado
+          setNeedsConfirmation(true);
+          setError('Tu cuenta no está confirmada. Revisa tu email o confirma tu cuenta manualmente.');
+          return;
+        }
+        
+        if (response.status === 429) {
+          setError('Demasiados intentos fallidos. Intenta nuevamente en unos minutos.');
+          return;
+        }
+
+        // Error general
         throw new Error(result.error || 'Error al iniciar sesión');
       }
 
+      // Login exitoso
+      console.log('Login exitoso:', result);
+      
       // Redireccionar al dashboard o página solicitada
       router.push(redirectUrl);
       router.refresh(); // Forzar actualización del middleware
+      
     } catch (error: any) {
       console.error('Error de login:', error);
+      
       if (error.errors) {
         // Errores de validación de Zod
         const errors: Record<string, string> = {};
@@ -76,6 +100,11 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendConfirmation = () => {
+    // Redirigir a página de confirmación con el email
+    router.push(`/confirm-signup?email=${encodeURIComponent(formData.email)}`);
   };
 
   return (
@@ -125,6 +154,30 @@ export default function LoginPage() {
               </div>
             )}
 
+            {needsConfirmation && (
+              <div className="mb-4 rounded-md bg-blue-50 p-4">
+                <div className="flex">
+                  <HiOutlineInformationCircle className="h-5 w-5 text-blue-400" />
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">Confirmación requerida</h3>
+                    <p className="mt-1 text-sm text-blue-700">
+                      Necesitas confirmar tu cuenta antes de iniciar sesión.
+                    </p>
+                    <div className="mt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResendConfirmation}
+                      >
+                        Ir a confirmación
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <Input
@@ -167,6 +220,7 @@ export default function LoginPage() {
                   loading={isLoading}
                   className="w-full"
                   size="lg"
+                  disabled={needsConfirmation}
                 >
                   {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
                 </Button>

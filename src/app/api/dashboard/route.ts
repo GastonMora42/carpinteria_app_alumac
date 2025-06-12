@@ -1,15 +1,12 @@
-// ===================================
-
-// src/app/api/dashboard/route.ts
+// src/app/api/dashboard/route.ts - ACTUALIZADO
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { verifyAuth } from '@/lib/auth/verify';
+import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
 
-// GET - Datos del dashboard
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    await verifyAuth(token);
+    // Usar la nueva verificación de Cognito
+    const user = await verifyCognitoAuth(req);
     
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -135,11 +132,21 @@ export async function GET(req: NextRequest) {
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al obtener datos del dashboard:', error);
+    
+    // Manejar errores de autenticación
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al obtener datos del dashboard' },
       { status: 500 }
     );
   }
 }
+

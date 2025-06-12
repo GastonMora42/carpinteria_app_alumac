@@ -1,16 +1,14 @@
-// ===================================
+// ============================================================================
 
-// src/app/api/transacciones/route.ts
+// src/app/api/transacciones/route.ts - ACTUALIZADO
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { transaccionSchema } from '@/lib/validations/transaccion';
-import { verifyAuth } from '@/lib/auth/verify';
+import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
 
-// GET - Listar transacciones
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    await verifyAuth(token);
+    const user = await verifyCognitoAuth(req);
     
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -84,8 +82,16 @@ export async function GET(req: NextRequest) {
         limit
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al obtener transacciones:', error);
+    
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al obtener transacciones' },
       { status: 500 }
@@ -93,11 +99,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Crear nueva transacción
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    const user = await verifyAuth(token);
+    const user = await verifyCognitoAuth(req);
     
     const body = await req.json();
     const validatedData = transaccionSchema.parse(body);
@@ -107,16 +111,14 @@ export async function POST(req: NextRequest) {
     const numero = `TRX-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
     
     const result = await prisma.$transaction(async (tx: {
-            transaccion: { create: (arg0: { data: { numero: string; tipo: "INGRESO" | "PAGO_OBRA" | "ANTICIPO" | "EGRESO" | "PAGO_PROVEEDOR" | "GASTO_GENERAL" | "TRANSFERENCIA" | "AJUSTE"; concepto: string; descripcion: string | undefined; monto: number; moneda: "PESOS" | "DOLARES"; cotizacion: number | undefined; fecha: Date; fechaVencimiento: Date | undefined; numeroComprobante: string | undefined; tipoComprobante: string | undefined; clienteId: string | undefined; proveedorId: string | undefined; pedidoId: string | undefined; medioPagoId: string; userId: any; }; include: { cliente: boolean; proveedor: boolean; pedido: boolean; medioPago: boolean; }; }) => any; }; pedido: {
-                findUnique: (arg0: { where: { id: string; }; }) => any; update: (arg0: {
-                    where: { id: string; }; data: {
-                        totalCobrado: any; saldoPendiente: number;
-                        // Actualizar estado si está completamente cobrado
-                        estado: any;
-                    };
-                }) => any;
-            };
-        }) => {
+        transaccion: {
+          create: (arg0: {
+            data: {
+              numero: string; tipo: "INGRESO" | "EGRESO" | "ANTICIPO" | "PAGO_OBRA" | "PAGO_PROVEEDOR" | "GASTO_GENERAL" | "TRANSFERENCIA" | "AJUSTE"; concepto: string; descripcion: string | undefined; monto: number; moneda: "PESOS" | "DOLARES"; cotizacion: number | undefined; fecha: Date; fechaVencimiento: Date | undefined; numeroComprobante: string | undefined; tipoComprobante: string | undefined; clienteId: string | undefined; proveedorId: string | undefined; pedidoId: string | undefined; medioPagoId: string; userId: string; // Usar ID del usuario autenticado
+            }; include: { cliente: boolean; proveedor: boolean; pedido: boolean; medioPago: boolean; };
+          }) => any;
+        }; pedido: { findUnique: (arg0: { where: { id: string; }; }) => any; update: (arg0: { where: { id: string; }; data: { totalCobrado: any; saldoPendiente: number; estado: any; }; }) => any; };
+      }) => {
       // Crear transacción
       const transaccion = await tx.transaccion.create({
         data: {
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
           proveedorId: validatedData.proveedorId,
           pedidoId: validatedData.pedidoId,
           medioPagoId: validatedData.medioPagoId,
-          userId: user.id
+          userId: user.id // Usar ID del usuario autenticado
         },
         include: {
           cliente: true,
@@ -160,7 +162,6 @@ export async function POST(req: NextRequest) {
             data: {
               totalCobrado: nuevoTotalCobrado,
               saldoPendiente: nuevoSaldoPendiente,
-              // Actualizar estado si está completamente cobrado
               estado: nuevoSaldoPendiente <= 0 ? 'COBRADO' : pedido.estado
             }
           });
@@ -171,8 +172,16 @@ export async function POST(req: NextRequest) {
     });
     
     return NextResponse.json(result, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al crear transacción:', error);
+    
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al crear transacción' },
       { status: 500 }

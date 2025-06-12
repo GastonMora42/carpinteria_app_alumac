@@ -1,4 +1,4 @@
-// middleware.ts
+// middleware.ts - ACTUALIZADO
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { cognitoAuth } from './src/lib/auth/cognito';
@@ -23,6 +23,7 @@ export async function middleware(request: NextRequest) {
         await cognitoAuth.verifyToken(idToken);
         return NextResponse.redirect(new URL('/dashboard', request.url));
       } catch (error) {
+        console.error('Token verification failed in middleware:', error);
         // Token inválido, limpiar cookies y continuar
         const response = NextResponse.next();
         response.cookies.delete('cognito-id-token');
