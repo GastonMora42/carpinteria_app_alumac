@@ -1,8 +1,9 @@
 // ===================================
 
-// src/hooks/use-ventas.ts
+// src/hooks/use-ventas.ts - ACTUALIZADO CON HTTP CLIENT
 import { useState, useEffect, ReactNode } from 'react';
 import { VentaFormData } from '@/lib/validations/venta';
+import { api } from '@/lib/utils/http';
 
 interface Venta {
   avance: ReactNode;
@@ -54,6 +55,8 @@ export function useVentas(params: UseVentasParams = {}) {
       setLoading(true);
       setError(null);
       
+      console.log('🛒 Fetching ventas with params:', params);
+      
       const searchParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -61,65 +64,64 @@ export function useVentas(params: UseVentasParams = {}) {
         }
       });
 
-      const response = await fetch(`/api/ventas?${searchParams}`);
+      // Usar api.get que incluye automáticamente cookies
+      const data = await api.get(`/api/ventas?${searchParams}`);
       
-      if (!response.ok) {
-        throw new Error('Error al cargar ventas');
+      console.log('✅ Ventas fetched successfully:', data.data?.length || 0);
+      
+      setVentas(data.data || []);
+      setPagination(data.pagination || { total: 0, pages: 0, page: 1, limit: 10 });
+    } catch (err: any) {
+      console.error('❌ Error fetching ventas:', err);
+      setError(err.message || 'Error al cargar ventas');
+      
+      // Si es error de autenticación, redirigir al login
+      if (err.message?.includes('Token') || err.message?.includes('401')) {
+        console.log('🔄 Redirecting to login due to auth error');
+        window.location.href = '/login';
+        return;
       }
-
-      const data = await response.json();
-      setVentas(data.data);
-      setPagination(data.pagination);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
   };
 
-  const createVenta = async (ventaData: VentaFormData) => {
+  const createVenta = async (ventaData: VentaFormData): Promise<Venta> => {
     try {
-      const response = await fetch('/api/ventas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ventaData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear venta');
-      }
-
-      const newVenta = await response.json();
+      console.log('➕ Creating venta:', ventaData.descripcionObra);
+      
+      // Usar api.post que incluye automáticamente cookies
+      const newVenta = await api.post('/api/ventas', ventaData);
+      
+      console.log('✅ Venta created successfully:', newVenta.id);
+      
       setVentas(prev => [newVenta, ...prev]);
       return newVenta;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error creating venta:', err);
+      throw new Error(err.message || 'Error al crear venta');
     }
   };
 
-  const updateEstado = async (id: string, nuevoEstado: string) => {
+  const updateEstado = async (id: string, nuevoEstado: string): Promise<Venta> => {
     try {
-      const response = await fetch(`/api/ventas/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: nuevoEstado })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar estado');
-      }
-
-      const updated = await response.json();
-      setVentas(prev => prev.map(v => v.id === id ? updated : v));
-      return updated;
-    } catch (err) {
-      throw err;
+      console.log('🔄 Updating venta estado:', id, nuevoEstado);
+      
+      // Usar api.put que incluye automáticamente cookies
+      const updatedVenta = await api.put(`/api/ventas/${id}`, { estado: nuevoEstado });
+      
+      console.log('✅ Venta estado updated successfully:', updatedVenta.id);
+      
+      setVentas(prev => prev.map(v => v.id === id ? updatedVenta : v));
+      return updatedVenta;
+    } catch (err: any) {
+      console.error('❌ Error updating venta estado:', err);
+      throw new Error(err.message || 'Error al actualizar estado');
     }
   };
 
   useEffect(() => {
+    console.log('🔄 useVentas effect triggered:', params);
     fetchVentas();
   }, [JSON.stringify(params)]);
 

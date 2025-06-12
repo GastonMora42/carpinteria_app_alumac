@@ -1,8 +1,7 @@
-// ===================================
-
-// src/hooks/use-presupuestos.ts
+// src/hooks/use-presupuestos.ts - ACTUALIZADO CON HTTP CLIENT
 import { useState, useEffect } from 'react';
 import { PresupuestoFormData } from '@/lib/validations/presupuesto';
+import { api } from '@/lib/utils/http';
 
 interface Presupuesto {
   id: string;
@@ -45,6 +44,8 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
       setLoading(true);
       setError(null);
       
+      console.log('📋 Fetching presupuestos with params:', params);
+      
       const searchParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -52,76 +53,70 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
         }
       });
 
-      const response = await fetch(`/api/presupuestos?${searchParams}`);
+      // Usar api.get que incluye automáticamente cookies
+      const data = await api.get(`/api/presupuestos?${searchParams}`);
       
-      if (!response.ok) {
-        throw new Error('Error al cargar presupuestos');
+      console.log('✅ Presupuestos fetched successfully:', data.data?.length || 0);
+      
+      setPresupuestos(data.data || []);
+      setPagination(data.pagination || { total: 0, pages: 0, page: 1, limit: 10 });
+    } catch (err: any) {
+      console.error('❌ Error fetching presupuestos:', err);
+      setError(err.message || 'Error al cargar presupuestos');
+      
+      // Si es error de autenticación, redirigir al login
+      if (err.message?.includes('Token') || err.message?.includes('401')) {
+        console.log('🔄 Redirecting to login due to auth error');
+        window.location.href = '/login';
+        return;
       }
-
-      const data = await response.json();
-      setPresupuestos(data.data);
-      setPagination(data.pagination);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
   };
 
-  const createPresupuesto = async (presupuestoData: PresupuestoFormData) => {
+  const createPresupuesto = async (presupuestoData: PresupuestoFormData): Promise<Presupuesto> => {
     try {
-      const response = await fetch('/api/presupuestos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(presupuestoData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear presupuesto');
-      }
-
-      const newPresupuesto = await response.json();
+      console.log('➕ Creating presupuesto:', presupuestoData.descripcionObra);
+      
+      // Usar api.post que incluye automáticamente cookies
+      const newPresupuesto = await api.post('/api/presupuestos', presupuestoData);
+      
+      console.log('✅ Presupuesto created successfully:', newPresupuesto.id);
+      
       setPresupuestos(prev => [newPresupuesto, ...prev]);
       return newPresupuesto;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error creating presupuesto:', err);
+      throw new Error(err.message || 'Error al crear presupuesto');
     }
   };
 
-  const updatePresupuesto = async (id: string, data: Partial<PresupuestoFormData>) => {
+  const updatePresupuesto = async (id: string, data: Partial<PresupuestoFormData>): Promise<Presupuesto> => {
     try {
-      const response = await fetch(`/api/presupuestos/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar presupuesto');
-      }
-
-      const updated = await response.json();
-      setPresupuestos(prev => prev.map(p => p.id === id ? updated : p));
-      return updated;
-    } catch (err) {
-      throw err;
+      console.log('✏️ Updating presupuesto:', id);
+      
+      // Usar api.put que incluye automáticamente cookies
+      const updatedPresupuesto = await api.put(`/api/presupuestos/${id}`, data);
+      
+      console.log('✅ Presupuesto updated successfully:', updatedPresupuesto.id);
+      
+      setPresupuestos(prev => prev.map(p => p.id === id ? updatedPresupuesto : p));
+      return updatedPresupuesto;
+    } catch (err: any) {
+      console.error('❌ Error updating presupuesto:', err);
+      throw new Error(err.message || 'Error al actualizar presupuesto');
     }
   };
 
   const convertirAVenta = async (id: string) => {
     try {
-      const response = await fetch(`/api/presupuestos/${id}/convertir`, {
-        method: 'POST'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al convertir presupuesto');
-      }
-
-      const pedido = await response.json();
+      console.log('🔄 Converting presupuesto to sale:', id);
+      
+      // Usar api.post que incluye automáticamente cookies
+      const pedido = await api.post(`/api/presupuestos/${id}/convertir`);
+      
+      console.log('✅ Presupuesto converted successfully:', pedido.id);
       
       // Actualizar estado del presupuesto en la lista
       setPresupuestos(prev => prev.map(p => 
@@ -129,12 +124,14 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
       ));
       
       return pedido;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error converting presupuesto:', err);
+      throw new Error(err.message || 'Error al convertir presupuesto');
     }
   };
 
   useEffect(() => {
+    console.log('🔄 usePresupuestos effect triggered:', params);
     fetchPresupuestos();
   }, [JSON.stringify(params)]);
 
@@ -149,4 +146,3 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
     convertirAVenta
   };
 }
-

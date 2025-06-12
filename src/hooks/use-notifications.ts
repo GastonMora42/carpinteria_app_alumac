@@ -1,5 +1,8 @@
-// src/hooks/use-notifications.ts
+// ===================================
+
+// src/hooks/use-notifications.ts - ACTUALIZADO PARA CONSISTENCIA
 import { useState, useEffect, useCallback } from 'react';
+import { api } from '@/lib/utils/http';
 import { Notification, NotificationType, NotificationPriority } from '@/lib/notifications/types';
 
 export function useNotifications() {
@@ -38,50 +41,93 @@ export function useNotifications() {
   ];
 
   const loadNotifications = useCallback(async () => {
-    setLoading(true);
-    // Simular carga de API
-    setTimeout(() => {
-      setNotifications(mockNotifications);
-      setUnreadCount(mockNotifications.filter(n => !n.read).length);
+    try {
+      setLoading(true);
+      console.log('🔔 Loading notifications...');
+      
+      // En el futuro, usar: const data = await api.get('/api/notifications');
+      // Por ahora, simular carga de API
+      setTimeout(() => {
+        console.log('✅ Notifications loaded (mock data)');
+        setNotifications(mockNotifications);
+        setUnreadCount(mockNotifications.filter(n => !n.read).length);
+        setLoading(false);
+      }, 1000);
+    } catch (err: any) {
+      console.error('❌ Error loading notifications:', err);
       setLoading(false);
-    }, 1000);
+    }
   }, []);
 
   const markAsRead = useCallback(async (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      console.log('✅ Marking notification as read:', id);
+      
+      // En el futuro, usar: await api.put(`/api/notifications/${id}/read`);
+      
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err: any) {
+      console.error('❌ Error marking notification as read:', err);
+    }
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
+    try {
+      console.log('✅ Marking all notifications as read');
+      
+      // En el futuro, usar: await api.put('/api/notifications/mark-all-read');
+      
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (err: any) {
+      console.error('❌ Error marking all notifications as read:', err);
+    }
   }, []);
 
   const deleteNotification = useCallback(async (id: string) => {
-    const notification = notifications.find(n => n.id === id);
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    if (notification && !notification.read) {
-      setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      console.log('🗑️ Deleting notification:', id);
+      
+      // En el futuro, usar: await api.delete(`/api/notifications/${id}`);
+      
+      const notification = notifications.find(n => n.id === id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      if (notification && !notification.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err: any) {
+      console.error('❌ Error deleting notification:', err);
     }
   }, [notifications]);
 
   const createNotification = useCallback(async (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      read: false
-    };
-    
-    setNotifications(prev => [newNotification, ...prev]);
-    setUnreadCount(prev => prev + 1);
-    
-    return newNotification;
+    try {
+      console.log('➕ Creating notification:', notification.title);
+      
+      // En el futuro, usar: const newNotification = await api.post('/api/notifications', notification);
+      
+      const newNotification: Notification = {
+        ...notification,
+        id: Date.now().toString(),
+        createdAt: new Date(),
+        read: false
+      };
+      
+      setNotifications(prev => [newNotification, ...prev]);
+      setUnreadCount(prev => prev + 1);
+      
+      return newNotification;
+    } catch (err: any) {
+      console.error('❌ Error creating notification:', err);
+      throw err;
+    }
   }, []);
 
   useEffect(() => {
+    console.log('🔄 useNotifications effect triggered');
     loadNotifications();
   }, [loadNotifications]);
 
@@ -96,3 +142,4 @@ export function useNotifications() {
     refresh: loadNotifications
   };
 }
+

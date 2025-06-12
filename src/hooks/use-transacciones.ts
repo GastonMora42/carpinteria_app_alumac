@@ -1,8 +1,8 @@
-// ===================================
 
-// src/hooks/use-transacciones.ts
+// src/hooks/use-transacciones.ts - ACTUALIZADO CON HTTP CLIENT
 import { useState, useEffect } from 'react';
 import { TransaccionFormData } from '@/lib/validations/transaccion';
+import { api } from '@/lib/utils/http';
 
 interface Transaccion {
   id: string;
@@ -45,6 +45,8 @@ export function useTransacciones(params: UseTransaccionesParams = {}) {
       setLoading(true);
       setError(null);
       
+      console.log('💰 Fetching transacciones with params:', params);
+      
       const searchParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -52,44 +54,47 @@ export function useTransacciones(params: UseTransaccionesParams = {}) {
         }
       });
 
-      const response = await fetch(`/api/transacciones?${searchParams}`);
+      // Usar api.get que incluye automáticamente cookies
+      const data = await api.get(`/api/transacciones?${searchParams}`);
       
-      if (!response.ok) {
-        throw new Error('Error al cargar transacciones');
+      console.log('✅ Transacciones fetched successfully:', data.data?.length || 0);
+      
+      setTransacciones(data.data || []);
+      setPagination(data.pagination || { total: 0, pages: 0, page: 1, limit: 10 });
+    } catch (err: any) {
+      console.error('❌ Error fetching transacciones:', err);
+      setError(err.message || 'Error al cargar transacciones');
+      
+      // Si es error de autenticación, redirigir al login
+      if (err.message?.includes('Token') || err.message?.includes('401')) {
+        console.log('🔄 Redirecting to login due to auth error');
+        window.location.href = '/login';
+        return;
       }
-
-      const data = await response.json();
-      setTransacciones(data.data);
-      setPagination(data.pagination);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
   };
 
-  const createTransaccion = async (transaccionData: TransaccionFormData) => {
+  const createTransaccion = async (transaccionData: TransaccionFormData): Promise<Transaccion> => {
     try {
-      const response = await fetch('/api/transacciones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaccionData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear transacción');
-      }
-
-      const newTransaccion = await response.json();
+      console.log('➕ Creating transaccion:', transaccionData.concepto);
+      
+      // Usar api.post que incluye automáticamente cookies
+      const newTransaccion = await api.post('/api/transacciones', transaccionData);
+      
+      console.log('✅ Transaccion created successfully:', newTransaccion.id);
+      
       setTransacciones(prev => [newTransaccion, ...prev]);
       return newTransaccion;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error creating transaccion:', err);
+      throw new Error(err.message || 'Error al crear transacción');
     }
   };
 
   useEffect(() => {
+    console.log('🔄 useTransacciones effect triggered:', params);
     fetchTransacciones();
   }, [JSON.stringify(params)]);
 
