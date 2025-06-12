@@ -1,31 +1,32 @@
-// src/app/login/page.tsx
+// src/app/register/page.tsx
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
+import { registerSchema, type RegisterFormData } from '@/lib/validations/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle } from 'react-icons/hi';
+import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle, HiOutlineCheckCircle } from 'react-icons/hi';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('from') || '/dashboard';
-  const expired = searchParams.get('expired');
   
-  const [formData, setFormData] = useState<LoginFormData>({
+  const [formData, setFormData] = useState<RegisterFormData>({
+    name: '',
     email: '',
-    password: ''
+    password: '',
+    confirmPassword: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const handleChange = (field: keyof LoginFormData, value: string) => {
+  const handleChange = (field: keyof RegisterFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Limpiar errores al escribir
     if (fieldErrors[field]) {
@@ -38,13 +39,14 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
     setFieldErrors({});
 
     try {
       // Validar con Zod
-      const validatedData = loginSchema.parse(formData);
+      const validatedData = registerSchema.parse(formData);
 
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(validatedData),
@@ -53,14 +55,25 @@ export default function LoginPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Error al iniciar sesión');
+        throw new Error(result.error || 'Error en el registro');
       }
 
-      // Redireccionar al dashboard o página solicitada
-      router.push(redirectUrl);
-      router.refresh(); // Forzar actualización del middleware
+      setSuccess(result.message);
+      
+      // Si necesita confirmación, redirigir a la página de confirmación
+      if (result.needsConfirmation) {
+        setTimeout(() => {
+          router.push(`/confirm-signup?email=${encodeURIComponent(formData.email)}`);
+        }, 2000);
+      } else {
+        // Si no necesita confirmación, redirigir al login
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+      }
+
     } catch (error: any) {
-      console.error('Error de login:', error);
+      console.error('Error de registro:', error);
       if (error.errors) {
         // Errores de validación de Zod
         const errors: Record<string, string> = {};
@@ -71,7 +84,7 @@ export default function LoginPage() {
         });
         setFieldErrors(errors);
       } else {
-        setError(error.message || 'Error al iniciar sesión');
+        setError(error.message || 'Error en el registro');
       }
     } finally {
       setIsLoading(false);
@@ -87,31 +100,17 @@ export default function LoginPage() {
             <span className="text-white text-2xl font-bold">AG</span>
           </div>
           <h2 className="text-3xl font-extrabold text-gray-900">
-            AlumGestión
+            Crear Cuenta
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Sistema de Gestión para Carpintería de Aluminio
+            Únete a AlumGestión
           </p>
         </div>
 
-        {/* Alertas */}
-        {expired && (
-          <div className="rounded-md bg-yellow-50 p-4">
-            <div className="flex">
-              <HiOutlineExclamationCircle className="h-5 w-5 text-yellow-400" />
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">
-                  Tu sesión ha expirado. Por favor, inicia sesión nuevamente.
-                </h3>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Login Form */}
+        {/* Register Form */}
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-center text-xl">Iniciar Sesión</CardTitle>
+            <CardTitle className="text-center text-xl">Registro</CardTitle>
           </CardHeader>
           <CardContent>
             {error && (
@@ -125,7 +124,30 @@ export default function LoginPage() {
               </div>
             )}
 
+            {success && (
+              <div className="mb-4 rounded-md bg-green-50 p-4">
+                <div className="flex">
+                  <HiOutlineCheckCircle className="h-5 w-5 text-green-400" />
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-green-800">{success}</h3>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form className="space-y-6" onSubmit={handleSubmit}>
+              <div>
+                <Input
+                  label="Nombre completo"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Tu nombre completo"
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  error={fieldErrors.name}
+                />
+              </div>
+
               <div>
                 <Input
                   label="Email"
@@ -142,11 +164,12 @@ export default function LoginPage() {
                 <Input
                   label="Contraseña"
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => handleChange('password', e.target.value)}
                   error={fieldErrors.password}
+                  helperText="Mínimo 8 caracteres con mayúscula, minúscula y número"
                 />
                 <button
                   type="button"
@@ -161,41 +184,53 @@ export default function LoginPage() {
                 </button>
               </div>
 
+              <div className="relative">
+                <Input
+                  label="Confirmar contraseña"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                  error={fieldErrors.confirmPassword}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 top-6 pr-3 flex items-center"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <HiOutlineEyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <HiOutlineEye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
+
               <div>
                 <Button
                   type="submit"
                   loading={isLoading}
                   className="w-full"
                   size="lg"
+                  disabled={!!success}
                 >
-                  {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                  {isLoading ? 'Creando cuenta...' : 'Crear Cuenta'}
                 </Button>
               </div>
             </form>
 
             {/* Links */}
-            <div className="mt-6 text-center space-y-2">
-              <Link 
-                href="/forgot-password" 
-                className="text-sm text-blue-600 hover:text-blue-500"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
+            <div className="mt-6 text-center">
               <div className="text-sm text-gray-600">
-                ¿No tienes cuenta?{' '}
-                <Link href="/register" className="text-blue-600 hover:text-blue-500">
-                  Regístrate aquí
+                ¿Ya tienes cuenta?{' '}
+                <Link href="/login" className="text-blue-600 hover:text-blue-500">
+                  Inicia sesión aquí
                 </Link>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Footer */}
-        <div className="text-center text-xs text-gray-500">
-          <p>© 2024 AlumGestión. Todos los derechos reservados.</p>
-          <p className="mt-1">Autenticación segura con AWS Cognito.</p>
-        </div>
       </div>
     </div>
   );

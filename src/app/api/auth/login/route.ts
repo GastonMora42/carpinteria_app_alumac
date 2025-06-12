@@ -1,74 +1,92 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { cognitoAuth } from '@/lib/auth/cognito';
 import { prisma } from '@/lib/db/prisma';
-import { generateToken } from '@/lib/auth/verify';
 import { loginSchema } from '@/lib/validations/auth';
-import bcrypt from 'bcryptjs';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { email, password } = loginSchema.parse(body);
 
-    // Buscar usuario en la base de datos
-    const user = await prisma.user.findUnique({
+    // Autenticar con Cognito
+    const authResult = await cognitoAuth.signIn(email, password);
+
+    // Buscar o crear usuario en la base de datos local
+    let dbUser = await prisma.user.findUnique({
       where: { email },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
-        activo: true,
-        password: true // Añadiremos este campo al schema
+        activo: true
       }
     });
 
-    if (!user || !user.activo) {
-      return NextResponse.json(
-        { error: 'Credenciales inválidas' },
-        { status: 401 }
-      );
+    // Si el usuario no existe en la BD local, crearlo
+    if (!dbUser) {
+      const userCount = await prisma.user.count();
+      const codigo = `USR-${String(userCount + 1).padStart(3, '0')}`;
+      
+      dbUser = await prisma.user.create({
+        data: {
+          codigo,
+          email: authResult.user.email,
+          name: authResult.user.name,
+          role: authResult.user['custom:role'] || 'USER',
+          cognitoId: authResult.user.sub
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          activo: true
+        }
+      });
     }
 
-    // Verificar contraseña (temporal - hasta AWS Cognito)
-    const isValidPassword = await bcrypt.compare(password, user.password || '');
-    
-    if (!isValidPassword) {
+    // Verificar que el usuario esté activo
+    if (!dbUser.activo) {
       return NextResponse.json(
-        { error: 'Credenciales inválidas' },
-        { status: 401 }
+        { error: 'Usuario inactivo' },
+        { status: 403 }
       );
     }
-
-    // Generar token JWT
-    const token = generateToken({
-      email: user.email,
-      name: user.name,
-      role: user.role
-    });
 
     // Actualizar último login
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: dbUser.id },
       data: { lastLoginAt: new Date() }
     });
 
-    return NextResponse.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
+    // Crear respuesta con cookies seguras
+    const response = NextResponse.json({
+      user: dbUser,
+      message: 'Inicio de sesión exitoso'
     });
 
-  } catch (error) {
+    // Configurar cookies HttpOnly y Secure
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      maxAge: 60 * 60 * 24 * 7, // 7 días
+      path: '/'
+    };
+
+    response.cookies.set('cognito-id-token', authResult.idToken, cookieOptions);
+    response.cookies.set('cognito-access-token', authResult.accessToken, cookieOptions);
+    response.cookies.set('cognito-refresh-token', authResult.refreshToken, cookieOptions);
+
+    return response;
+
+  } catch (error: any) {
     console.error('Error en login:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
+      { error: error.message || 'Error en el inicio de sesión' },
+      { status: 400 }
     );
   }
 }
-

@@ -1,7 +1,7 @@
 // src/components/layouts/Header.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/use-notifications';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
@@ -19,24 +19,92 @@ interface HeaderProps {
   onMenuToggle?: () => void;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 export default function Header({ onMenuToggle }: HeaderProps) {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { unreadCount } = useNotifications();
 
-  // Mock user data - replace with real user context
-  const user = {
-    name: 'Juan Pérez',
-    email: 'juan@empresa.com',
-    role: 'Administrador',
-    avatar: null
-  };
+  // Obtener información del usuario al cargar
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Error obteniendo información del usuario:', error);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const handleLogout = async () => {
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-    router.push('/login');
+    if (isLoggingOut) return;
+    
+    setIsLoggingOut(true);
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        // Forzar recarga completa para limpiar estado
+        window.location.href = '/login';
+      } else {
+        console.error('Error en logout');
+        // Forzar logout local si falla el servidor
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error('Error en logout:', error);
+      // Forzar logout local si hay error de red
+      window.location.href = '/login';
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
+
+  const getRoleLabel = (role: string) => {
+    const roleLabels: Record<string, string> = {
+      'ADMIN': 'Administrador',
+      'MANAGER': 'Gerente',
+      'USER': 'Usuario'
+    };
+    return roleLabels[role] || role;
+  };
+
+  if (!user) {
+    return (
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="flex items-center justify-between h-16 px-4">
+          <div className="animate-pulse">
+            <div className="h-8 w-48 bg-gray-200 rounded"></div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+            <div className="h-8 w-32 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>
@@ -96,21 +164,22 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               >
                 <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
-                    {user.name.split(' ').map(n => n[0]).join('')}
+                    {getInitials(user.name)}
                   </span>
                 </div>
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-medium text-gray-700">{user.name}</p>
-                  <p className="text-xs text-gray-500">{user.role}</p>
+                  <p className="text-xs text-gray-500">{getRoleLabel(user.role)}</p>
                 </div>
               </Button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                   <div className="py-1">
-                    <div className="px-4 py-2 border-b border-gray-200">
+                    <div className="px-4 py-3 border-b border-gray-200">
                       <p className="text-sm font-medium text-gray-900">{user.name}</p>
                       <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-xs text-blue-600">{getRoleLabel(user.role)}</p>
                     </div>
                     <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <HiOutlineUser className="mr-3 h-4 w-4" />
@@ -123,10 +192,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                     <div className="border-t border-gray-200">
                       <button 
                         onClick={handleLogout}
-                        className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                        disabled={isLoggingOut}
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
                       >
                         <HiOutlineLogout className="mr-3 h-4 w-4" />
-                        Cerrar Sesión
+                        {isLoggingOut ? 'Cerrando...' : 'Cerrar Sesión'}
                       </button>
                     </div>
                   </div>
@@ -142,6 +212,14 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
       />
+
+      {/* Overlay para cerrar dropdown */}
+      {isProfileOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setIsProfileOpen(false)}
+        />
+      )}
     </>
   );
 }
