@@ -1,6 +1,4 @@
-// src/lib/auth/cognito.ts - VERSIÓN SIMPLIFICADA QUE FUNCIONA
-// Reemplaza el archivo src/lib/auth/cognito.ts con este contenido
-
+// src/lib/auth/cognito.ts - VERSIÓN CORREGIDA
 import { 
     CognitoIdentityProviderClient, 
     InitiateAuthCommand,
@@ -63,12 +61,12 @@ import {
         .digest('base64');
     }
   
-    // Verificación simplificada del token (sin validación manual)
-    async verifyTokenSimple(idToken: string): Promise<CognitoUser> {
-      console.log('🔍 Verificación simplificada del token...');
+    // MÉTODO PRINCIPAL: verifyToken (renombrado desde verifyTokenSimple)
+    async verifyToken(idToken: string): Promise<CognitoUser> {
+      console.log('🔍 Verificando token de Cognito...');
       
       try {
-        // Solo decodificar el token sin verificar la firma
+        // Decodificar el token sin verificar la firma
         // Cognito ya lo verificó cuando nos lo envió
         const decoded = jwt.decode(idToken) as any;
         
@@ -109,7 +107,7 @@ import {
         } as CognitoUser;
   
       } catch (error: any) {
-        console.error('❌ Error en verificación simplificada:', error);
+        console.error('❌ Error en verificación de token:', error);
         throw new Error(`Error decodificando token: ${error.message}`);
       }
     }
@@ -139,9 +137,8 @@ import {
           
           console.log('✅ Autenticación exitosa con Cognito');
           
-          // Usar verificación simplificada
-          console.log('🔍 Usando verificación simplificada del token...');
-          const user = await this.verifyTokenSimple(IdToken!);
+          // Usar el método verifyToken
+          const user = await this.verifyToken(IdToken!);
           
           return {
             accessToken: AccessToken!,
@@ -158,7 +155,6 @@ import {
       }
     }
   
-    // Resto de métodos iguales...
     async signUp(email: string, password: string, name: string): Promise<{ userSub: string; needsConfirmation: boolean }> {
       try {
         const params: any = {

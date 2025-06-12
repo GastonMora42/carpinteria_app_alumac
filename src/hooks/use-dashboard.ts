@@ -1,7 +1,6 @@
-// ===================================
-
-// src/hooks/use-dashboard.ts
+// src/hooks/use-dashboard.ts - CORREGIDO CON utils/http.ts
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/utils/http';
 
 interface DashboardData {
   estadisticas: {
@@ -33,22 +32,32 @@ export function useDashboard() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/dashboard');
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar datos del dashboard');
-      }
+      console.log('📊 Fetching dashboard data...');
 
-      const dashboardData = await response.json();
+      // Usar api.get que incluye automáticamente cookies
+      const dashboardData = await api.get('/api/dashboard');
+      
+      console.log('✅ Dashboard data fetched successfully');
+      console.log('📈 Stats:', dashboardData.estadisticas);
+      
       setData(dashboardData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } catch (err: any) {
+      console.error('❌ Error fetching dashboard data:', err);
+      setError(err.message || 'Error al cargar datos del dashboard');
+      
+      // Si es error de autenticación, redirigir al login
+      if (err.message?.includes('Token') || err.message?.includes('401')) {
+        console.log('🔄 Redirecting to login due to auth error');
+        window.location.href = '/login?from=/dashboard';
+        return;
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('🔄 useDashboard effect triggered');
     fetchDashboardData();
   }, []);
 
@@ -59,4 +68,3 @@ export function useDashboard() {
     refetch: fetchDashboardData
   };
 }
-

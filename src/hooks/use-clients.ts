@@ -1,6 +1,7 @@
-// src/hooks/use-clients.ts
+// src/hooks/use-clients.ts - CORREGIDO CON utils/http.ts
 import { useState, useEffect } from 'react';
 import { ClienteFormData } from '@/lib/validations/client';
+import { api } from '@/lib/utils/http';
 
 interface Cliente {
   id: string;
@@ -38,90 +39,90 @@ export function useClients({ page = 1, limit = 10, search }: UseClientsParams = 
       setLoading(true);
       setError(null);
       
+      console.log('🔍 Fetching clients with params:', { page, limit, search });
+      
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         ...(search && { search })
       });
 
-      const response = await fetch(`/api/clientes?${params}`);
+      // Usar api.get que incluye automáticamente cookies
+      const data = await api.get(`/api/clientes?${params}`);
       
-      if (!response.ok) {
-        throw new Error('Error al cargar clientes');
+      console.log('✅ Clients fetched successfully:', data.data?.length || 0);
+      
+      setClients(data.data || []);
+      setPagination(data.pagination || { total: 0, pages: 0, page: 1, limit: 10 });
+    } catch (err: any) {
+      console.error('❌ Error fetching clients:', err);
+      setError(err.message || 'Error al cargar clientes');
+      
+      // Si es error de autenticación, redirigir al login
+      if (err.message?.includes('Token') || err.message?.includes('401')) {
+        console.log('🔄 Redirecting to login due to auth error');
+        window.location.href = '/login';
+        return;
       }
-
-      const data = await response.json();
-      setClients(data.data);
-      setPagination(data.pagination);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
   };
 
-  const createClient = async (clientData: ClienteFormData) => {
+  const createClient = async (clientData: ClienteFormData): Promise<Cliente> => {
     try {
-      const response = await fetch('/api/clientes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clientData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear cliente');
-      }
-
-      const newClient = await response.json();
+      console.log('➕ Creating client:', clientData.nombre);
+      
+      // Usar api.post que incluye automáticamente cookies
+      const newClient = await api.post('/api/clientes', clientData);
+      
+      console.log('✅ Client created successfully:', newClient.id);
+      
       setClients(prev => [newClient, ...prev]);
       return newClient;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error creating client:', err);
+      throw new Error(err.message || 'Error al crear cliente');
     }
   };
 
-  const updateClient = async (id: string, clientData: Partial<ClienteFormData>) => {
+  const updateClient = async (id: string, clientData: Partial<ClienteFormData>): Promise<Cliente> => {
     try {
-      const response = await fetch(`/api/clientes/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clientData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar cliente');
-      }
-
-      const updatedClient = await response.json();
+      console.log('✏️ Updating client:', id);
+      
+      // Usar api.put que incluye automáticamente cookies
+      const updatedClient = await api.put(`/api/clientes/${id}`, clientData);
+      
+      console.log('✅ Client updated successfully:', updatedClient.id);
+      
       setClients(prev => prev.map(client => 
         client.id === id ? updatedClient : client
       ));
       return updatedClient;
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error updating client:', err);
+      throw new Error(err.message || 'Error al actualizar cliente');
     }
   };
 
-  const deleteClient = async (id: string) => {
+  const deleteClient = async (id: string): Promise<void> => {
     try {
-      const response = await fetch(`/api/clientes/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al eliminar cliente');
-      }
-
+      console.log('🗑️ Deleting client:', id);
+      
+      // Usar api.delete que incluye automáticamente cookies
+      await api.delete(`/api/clientes/${id}`);
+      
+      console.log('✅ Client deleted successfully:', id);
+      
       setClients(prev => prev.filter(client => client.id !== id));
-    } catch (err) {
-      throw err;
+    } catch (err: any) {
+      console.error('❌ Error deleting client:', err);
+      throw new Error(err.message || 'Error al eliminar cliente');
     }
   };
 
   useEffect(() => {
+    console.log('🔄 useClients effect triggered:', { page, limit, search });
     fetchClients();
   }, [page, limit, search]);
 
@@ -151,16 +152,21 @@ export function useClient(id: string | null) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/clientes/${id}`);
+        console.log('🔍 Fetching client:', id);
         
-        if (!response.ok) {
-          throw new Error('Cliente no encontrado');
-        }
-
-        const data = await response.json();
+        // Usar api.get que incluye automáticamente cookies
+        const data = await api.get(`/api/clientes/${id}`);
+        
+        console.log('✅ Client fetched successfully:', data.id);
         setClient(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error desconocido');
+      } catch (err: any) {
+        console.error('❌ Error fetching client:', err);
+        setError(err.message || 'Error al cargar cliente');
+        
+        // Si es error 404, cliente no encontrado
+        if (err.message?.includes('404')) {
+          setError('Cliente no encontrado');
+        }
       } finally {
         setLoading(false);
       }
@@ -171,4 +177,3 @@ export function useClient(id: string | null) {
 
   return { client, loading, error };
 }
-
