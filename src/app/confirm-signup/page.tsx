@@ -25,6 +25,7 @@ export default function ConfirmSignUpPage() {
     setIsLoading(true);
     setError(null);
     setSuccess(null);
+    
 
     try {
       const response = await fetch('/api/auth/confirm-signup', {
