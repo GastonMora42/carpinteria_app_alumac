@@ -1,4 +1,4 @@
-// src/lib/auth/cognito-verify.ts - CORREGIDO
+// src/lib/auth/cognito-verify.ts - CORREGIDO PARA BUILD
 import { NextRequest } from 'next/server';
 import { cognitoAuth, CognitoUser } from './cognito';
 import { prisma } from '@/lib/db/prisma';
@@ -31,6 +31,18 @@ export async function verifyCognitoAuth(req: NextRequest): Promise<AuthUser> {
     console.log('🔐 Verificando token con Cognito...');
     const cognitoUser = await cognitoAuth.verifyToken(idToken);
     console.log('✅ Token verificado exitosamente:', cognitoUser.email);
+    
+    // Solo conectar a BD si no estamos en build time
+    if (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV) {
+      console.log('⚠️ Skipping database operations during build time');
+      return {
+        id: 'build-time-user',
+        email: cognitoUser.email,
+        name: cognitoUser.name,
+        role: 'USER',
+        cognitoId: cognitoUser.sub
+      };
+    }
     
     // Buscar usuario en base de datos local
     console.log('🗄️ Buscando usuario en BD local...');

@@ -1,9 +1,6 @@
-// next.config.js actualizado
+// next.config.ts - CORREGIDO PARA NEXT.JS 15
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-      serverExternalPackages: ['@aws-sdk'],
-  },
   env: {
     AWS_REGION: process.env.AWS_REGION,
     COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID,
@@ -21,6 +18,10 @@ const nextConfig = {
       },
     ];
   },
+  // Configuración específica para Vercel
+  ...(process.env.VERCEL && {
+    output: 'standalone'
+  })
 }
 
-module.exports = nextConfig
+export default nextConfig;
