@@ -1,7 +1,7 @@
 // ===================================
 
 // prisma/seed.ts - Archivo para crear datos iniciales
-import { PrismaClient } from '@prisma/client';
+import { Moneda, PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -141,7 +141,11 @@ async function main() {
     await prisma.material.upsert({
       where: { codigo: material.codigo },
       update: {},
-      create: material,
+      create: {
+        ...material,
+        tipo: material.tipo as 'PERFIL' | 'VIDRIO' | 'ACCESORIO',
+        moneda: material.moneda as Moneda,
+      },
     });
   }
 
