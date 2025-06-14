@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
       resumen: {
         alertas: {
           presupuestosVencen: presupuestosVencenProximamente.length,
-          pedidosAtrasados: pedidosEnProceso.filter((p: { fechaEntrega: string | number | Date; }) => 
+          pedidosAtrasados: pedidosEnProceso.filter((p) => 
             p.fechaEntrega && new Date(p.fechaEntrega) < now
           ).length
         }
