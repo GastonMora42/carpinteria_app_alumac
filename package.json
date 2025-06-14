@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "next dev",
-    "build": "next build --no-lint", 
+    "build": "next build --no-lint",
     "start": "next start",
     "lint": "next lint",
     "test": "tsx src/lib/testing/test-runner.ts",
@@ -17,7 +17,6 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.828.0",
     "@prisma/client": "^6.9.0",
-    "@types/bcryptjs": "^3.0.0",
     "@types/jsonwebtoken": "^9.0.9",
     "axios": "^1.9.0",
     "bcryptjs": "^3.0.2",

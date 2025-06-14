@@ -1,21 +1,26 @@
+
+// ===================================
+// src/app/api/presupuestos/[id]/convertir/route.ts - CORREGIDO PARA NEXT.JS 15
 // ===================================
 
-// src/app/api/presupuestos/[id]/convertir/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { verifyAuth } from '@/lib/auth/verify';
+import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
 
 // POST - Convertir presupuesto a pedido
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = req.cookies.get('token')?.value;
-    const user = await verifyAuth(token);
+    // Verificar autenticación
+    const user = await verifyCognitoAuth(req);
+    
+    // Obtener parámetros (async en Next.js 15)
+    const { id } = await params;
     
     const presupuesto = await prisma.presupuesto.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         items: true,
         cliente: true
@@ -41,7 +46,7 @@ export async function POST(
     const numeroPedido = `VEN-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
     
     // Crear pedido en una transacción
-    const result = await prisma.$transaction(async (tx: { pedido: { create: (arg0: { data: { numero: string; clienteId: any; presupuestoId: any; descripcionObra: any; observaciones: any; condicionesPago: any; subtotal: any; descuento: any; impuestos: any; total: any; saldoPendiente: any; moneda: any; userId: any; }; }) => any; }; presupuesto: { update: (arg0: { where: { id: any; }; data: { estado: string; }; }) => any; }; }) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Crear pedido
       const pedido = await tx.pedido.create({
         data: {
@@ -71,12 +76,20 @@ export async function POST(
     });
     
     return NextResponse.json(result, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al convertir presupuesto:', error);
+    
+    // Manejar errores de autenticación
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al convertir presupuesto' },
       { status: 500 }
     );
   }
 }
-

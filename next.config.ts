@@ -2,7 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['@aws-sdk']
+      serverExternalPackages: ['@aws-sdk'],
   },
   env: {
     AWS_REGION: process.env.AWS_REGION,
