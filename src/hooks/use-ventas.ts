@@ -12,6 +12,7 @@ interface Venta {
   id: string;
   numero: string;
   cliente: {
+    telefono: any;
     id: string;
     nombre: string;
     email?: string;
