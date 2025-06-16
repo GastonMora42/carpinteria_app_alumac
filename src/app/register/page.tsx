@@ -1,14 +1,15 @@
-// src/app/register/page.tsx
+// src/app/register/page.tsx - ACTUALIZADO CON LOGO
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { registerSchema, type RegisterFormData } from '@/lib/validations/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle, HiOutlineCheckCircle } from 'react-icons/hi';
+import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle, HiOutlineCheckCircle, HiOutlineArrowLeft } from 'react-icons/hi';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -94,17 +95,23 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
+        {/* Header con logo */}
         <div className="text-center">
-          <div className="mx-auto h-20 w-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-            <span className="text-white text-2xl font-bold">AG</span>
+          <Link href="/" className="inline-flex items-center mb-6 group">
+            <HiOutlineArrowLeft className="h-5 w-5 text-gray-400 group-hover:text-gray-600 transition-colors mr-2" />
+            <span className="text-gray-600 group-hover:text-gray-800 transition-colors">Volver al inicio</span>
+          </Link>
+          
+          <div className="mb-6">
+            <Image 
+              src="/alumac.webp" 
+              alt="AlumGestión Logo" 
+              width={80} 
+              height={80}
+              className="mx-auto mb-4"
+            />
+            <h2 className="text-3xl font-extrabold text-gray-900">Crear Cuenta</h2>
           </div>
-          <h2 className="text-3xl font-extrabold text-gray-900">
-            Crear Cuenta
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Únete a AlumGestión
-          </p>
         </div>
 
         {/* Register Form */}
@@ -229,8 +236,24 @@ export default function RegisterPage() {
                 </Link>
               </div>
             </div>
+            
+            {/* Términos y condiciones */}
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500">
+                Al registrarte, aceptas nuestros{' '}
+                <a href="#" className="text-blue-600 hover:text-blue-500">Términos de Servicio</a>
+                {' '}y{' '}
+                <a href="#" className="text-blue-600 hover:text-blue-500">Política de Privacidad</a>
+              </p>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-gray-500">
+          <p>© 2025 AlumGestión.</p>
+          <p className="mt-1">Autenticación segura con AWS Cognito.</p>
+        </div>
       </div>
     </div>
   );

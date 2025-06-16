@@ -1,7 +1,8 @@
-// src/components/layouts/Sidebar.tsx
+// src/components/layouts/Sidebar.tsx - ACTUALIZADO CON LOGO
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { 
   HiOutlineHome, 
@@ -109,17 +110,23 @@ export default function Sidebar() {
     <div className="hidden lg:flex lg:flex-shrink-0">
       <div className="flex flex-col w-64">
         <div className="flex flex-col flex-grow bg-gradient-to-b from-blue-800 to-blue-900 pt-5 pb-4 overflow-y-auto shadow-lg">
-          {/* Logo */}
+          {/* Logo mejorado */}
           <div className="flex items-center flex-shrink-0 px-4 mb-8">
-            <div className="flex items-center">
-              <div className="bg-white p-2 rounded-lg mr-3">
-                <HiOutlineCollection className="h-6 w-6 text-blue-600" />
+            <Link href="/dashboard" className="flex items-center group">
+              <div className="bg-white p-2 rounded-xl mr-3 shadow-md group-hover:shadow-lg transition-shadow">
+                <Image 
+                  src="/alumac.webp" 
+                  alt="AlumGestión Logo" 
+                  width={32} 
+                  height={32}
+                  className="rounded-lg"
+                />
               </div>
               <div>
                 <h1 className="text-white text-xl font-bold">AlumGestión</h1>
                 <p className="text-blue-200 text-xs">Sistema de Gestión</p>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Navigation */}
@@ -134,14 +141,14 @@ export default function Sidebar() {
                     href={item.href}
                     className={`${
                       isActive
-                        ? 'bg-blue-900 text-white border-r-4 border-blue-300'
-                        : 'text-blue-100 hover:bg-blue-700'
+                        ? 'bg-blue-900 text-white border-r-4 border-blue-300 shadow-inner'
+                        : 'text-blue-100 hover:bg-blue-700 hover:text-white'
                     } group flex items-center px-3 py-2 text-sm font-medium rounded-l-md transition-all duration-200`}
                   >
                     <item.icon
                       className={`${
-                        isActive ? 'text-white' : 'text-blue-300'
-                      } mr-3 flex-shrink-0 h-5 w-5`}
+                        isActive ? 'text-white' : 'text-blue-300 group-hover:text-white'
+                      } mr-3 flex-shrink-0 h-5 w-5 transition-colors duration-200`}
                       aria-hidden="true"
                     />
                     {item.name}
@@ -160,7 +167,7 @@ export default function Sidebar() {
                   
                   {/* Submenu */}
                   {hasSubmenu && isActive && (
-                    <div className="ml-6 space-y-1">
+                    <div className="ml-6 space-y-1 animate-in slide-in-from-top-2 duration-200">
                       {item.submenu?.map((subitem) => (
                         <Link
                           key={subitem.name}
@@ -171,7 +178,7 @@ export default function Sidebar() {
                               : 'text-blue-200 hover:text-white hover:bg-blue-700'
                           } group flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200`}
                         >
-                          <div className="w-1.5 h-1.5 bg-current rounded-full mr-2" />
+                          <div className="w-1.5 h-1.5 bg-current rounded-full mr-2 opacity-60" />
                           {subitem.name}
                         </Link>
                       ))}
@@ -182,11 +189,17 @@ export default function Sidebar() {
             })}
           </nav>
 
-          {/* Footer */}
+          {/* Footer mejorado */}
           <div className="flex-shrink-0 px-4 py-4 border-t border-blue-700">
-            <div className="text-xs text-blue-200">
-              <p>AlumGestión v1.0</p>
-              <p>© 2024 Tu Empresa</p>
+            <div className="bg-blue-800 rounded-lg p-3 text-center">
+              <div className="text-xs text-blue-200 mb-2">
+                <p className="font-semibold">AlumGestión v1.0</p>
+                <p>© 2025 Alumac</p>
+              </div>
+              <div className="flex items-center justify-center space-x-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-xs text-green-400 font-medium">Sistema Online</span>
+              </div>
             </div>
           </div>
         </div>

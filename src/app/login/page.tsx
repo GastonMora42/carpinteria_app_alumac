@@ -1,14 +1,15 @@
-// src/app/login/page.tsx - CORREGIDO PARA VERCEL DEPLOY
+// src/app/login/page.tsx - ACTUALIZADO CON LOGO
 'use client';
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle, HiOutlineInformationCircle } from 'react-icons/hi';
+import { HiOutlineEye, HiOutlineEyeOff, HiOutlineExclamationCircle, HiOutlineInformationCircle, HiOutlineArrowLeft } from 'react-icons/hi';
 
 // Componente separado que usa useSearchParams
 function LoginForm() {
@@ -110,17 +111,25 @@ function LoginForm() {
 
   return (
     <div className="max-w-md w-full space-y-8">
-      {/* Header */}
+      {/* Header con logo */}
       <div className="text-center">
-        <div className="mx-auto h-20 w-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-          <span className="text-white text-2xl font-bold">AG</span>
+        <Link href="/" className="inline-flex items-center mb-6 group">
+          <HiOutlineArrowLeft className="h-5 w-5 text-gray-400 group-hover:text-gray-600 transition-colors mr-2" />
+          <span className="text-gray-600 group-hover:text-gray-800 transition-colors">Volver al inicio</span>
+        </Link>
+        
+        <div className="mb-6">
+          <Image 
+            src="/alumac.webp" 
+            alt="AlumGestión Logo" 
+            width={80} 
+            height={80}
+            className="mx-auto mb-4"
+          />
+          <p className="mt-2 text-sm text-gray-600">
+            Sistema de Gestión para Carpintería de Aluminio
+          </p>
         </div>
-        <h2 className="text-3xl font-extrabold text-gray-900">
-          AlumGestión
-        </h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Sistema de Gestión para Carpintería de Aluminio
-        </p>
       </div>
 
       {/* Alertas */}

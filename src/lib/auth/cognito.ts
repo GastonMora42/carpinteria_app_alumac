@@ -1,4 +1,4 @@
-// src/lib/auth/cognito.ts - VERSIÓN CORREGIDA PARA BUILD
+// src/lib/auth/cognito.ts - VERSIÓN CORREGIDA PARA PRODUCCIÓN
 import { 
   CognitoIdentityProviderClient, 
   InitiateAuthCommand,
@@ -40,18 +40,41 @@ class CognitoAuthService {
   private initialize() {
     if (this.initialized) return;
 
-    // Solo inicializar si estamos en runtime (no durante build)
-    if (typeof window === 'undefined' && !process.env.VERCEL_ENV && process.env.NODE_ENV === 'production') {
-      // Estamos en build time, evitar inicialización
+    // CORREGIDO: Mejor detección de runtime vs build time
+    const isRuntime = typeof window !== 'undefined' || // En el browser
+                     process.env.VERCEL_ENV === 'production' || // En Vercel production runtime
+                     process.env.VERCEL_ENV === 'preview' || // En Vercel preview runtime
+                     (process.env.NODE_ENV === 'development'); // En desarrollo
+
+    if (!isRuntime) {
+      console.log('⚠️ Skipping Cognito initialization during build time');
       return;
     }
+
+    console.log('🔧 Initializing Cognito service...');
+    console.log('Environment check:', {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      hasWindow: typeof window !== 'undefined'
+    });
 
     this.userPoolId = process.env.COGNITO_USER_POOL_ID;
     this.clientId = process.env.COGNITO_CLIENT_ID;
     this.clientSecret = process.env.COGNITO_CLIENT_SECRET;
     
+    console.log('Cognito config check:', {
+      hasUserPoolId: !!this.userPoolId,
+      hasClientId: !!this.clientId,
+      hasClientSecret: !!this.clientSecret,
+      region: process.env.AWS_REGION
+    });
+    
     if (!this.userPoolId || !this.clientId) {
-      throw new Error('Missing required Cognito configuration');
+      const missingVars = [];
+      if (!this.userPoolId) missingVars.push('COGNITO_USER_POOL_ID');
+      if (!this.clientId) missingVars.push('COGNITO_CLIENT_ID');
+      
+      throw new Error(`Missing required Cognito configuration: ${missingVars.join(', ')}`);
     }
     
     this.client = new CognitoIdentityProviderClient({ 
@@ -59,6 +82,7 @@ class CognitoAuthService {
     });
     
     this.initialized = true;
+    console.log('✅ Cognito service initialized successfully');
   }
 
   private ensureInitialized() {
@@ -67,7 +91,7 @@ class CognitoAuthService {
     }
     
     if (!this.client || !this.userPoolId || !this.clientId) {
-      throw new Error('Cognito service not properly initialized');
+      throw new Error('Cognito service not properly initialized. Check environment variables.');
     }
   }
 
@@ -75,6 +99,7 @@ class CognitoAuthService {
     this.ensureInitialized();
     
     if (!this.clientSecret) {
+      console.log('⚠️ COGNITO_CLIENT_SECRET not provided, proceeding without SECRET_HASH');
       return undefined;
     }
     
@@ -90,7 +115,6 @@ class CognitoAuthService {
     
     try {
       // Decodificar el token sin verificar la firma
-      // Cognito ya lo verificó cuando nos lo envió
       const decoded = jwt.decode(idToken) as any;
       
       if (!decoded) {
@@ -101,8 +125,6 @@ class CognitoAuthService {
         sub: decoded.sub,
         email: decoded.email,
         name: decoded.name,
-        aud: decoded.aud,
-        iss: decoded.iss,
         exp: decoded.exp
       });
 
@@ -110,11 +132,6 @@ class CognitoAuthService {
       const now = Math.floor(Date.now() / 1000);
       if (decoded.exp && decoded.exp < now) {
         throw new Error('Token expirado');
-      }
-
-      // Verificar audience básica solo si tenemos clientId inicializado
-      if (this.clientId && decoded.aud !== this.clientId) {
-        console.warn('⚠️ Audience no coincide pero continuando...');
       }
 
       return {
@@ -162,7 +179,6 @@ class CognitoAuthService {
         
         console.log('✅ Autenticación exitosa con Cognito');
         
-        // Usar el método verifyToken
         const user = await this.verifyToken(IdToken!);
         
         return {
@@ -281,38 +297,6 @@ class CognitoAuthService {
     }
   }
 
-  async getUser(accessToken: string): Promise<CognitoUser> {
-    this.ensureInitialized();
-    
-    try {
-      const command = new GetUserCommand({
-        AccessToken: accessToken
-      });
-      
-      const response = await this.client!.send(command);
-      
-      const attributes: any = {};
-      response.UserAttributes?.forEach(attr => {
-        attributes[attr.Name!] = attr.Value;
-      });
-
-      return {
-        sub: response.Username!,
-        email: attributes.email,
-        name: attributes.name,
-        email_verified: attributes.email_verified === 'true',
-        'custom:role': attributes['custom:role'],
-        'custom:user_id': attributes['custom:user_id'],
-        aud: this.clientId!,
-        exp: Math.floor(Date.now() / 1000) + 3600,
-        iat: Math.floor(Date.now() / 1000)
-      };
-    } catch (error: any) {
-      console.error("Error getting user:", error);
-      throw this.handleCognitoError(error);
-    }
-  }
-
   private handleCognitoError(error: any): Error {
     const errorCode = error.name || error.__type;
     
@@ -353,5 +337,4 @@ class CognitoAuthService {
   }
 }
 
-// Crear instancia sin inicializar inmediatamente
 export const cognitoAuth = new CognitoAuthService();
