@@ -1,14 +1,15 @@
-// src/app/api/presupuestos/route.ts
+// src/app/api/presupuestos/route.ts - CORREGIDO
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { presupuestoSchema } from '@/lib/validations/presupuesto';
-import { verifyAuth } from '@/lib/auth/verify';
+import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
+import { CalculationUtils } from '@/lib/utils/calculations';
 
 // GET - Listar presupuestos con filtros
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    const user = await verifyAuth(token);
+    // CORREGIDO: Usar verifyCognitoAuth en lugar de verifyAuth
+    const user = await verifyCognitoAuth(req);
     
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -69,8 +70,17 @@ export async function GET(req: NextRequest) {
         limit
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al obtener presupuestos:', error);
+    
+    // Manejar errores de autenticación
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al obtener presupuestos' },
       { status: 500 }
@@ -81,8 +91,8 @@ export async function GET(req: NextRequest) {
 // POST - Crear nuevo presupuesto
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    const user = await verifyAuth(token);
+    // CORREGIDO: Usar verifyCognitoAuth en lugar de verifyAuth
+    const user = await verifyCognitoAuth(req);
     
     const body = await req.json();
     const validatedData = presupuestoSchema.parse(body);
@@ -91,15 +101,12 @@ export async function POST(req: NextRequest) {
     const count = await prisma.presupuesto.count();
     const numero = `PRES-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
     
-    // Calcular totales
-    const subtotal = validatedData.items.reduce((acc, item) => {
-      return acc + (item.cantidad * item.precioUnitario);
-    }, 0);
-    
-    const descuentoMonto = (subtotal * (validatedData.descuento || 0)) / 100;
-    const baseImponible = subtotal - descuentoMonto;
-    const impuestosMonto = (baseImponible * (validatedData.impuestos || 0)) / 100;
-    const total = baseImponible + impuestosMonto;
+    // Calcular totales usando la utilidad
+    const totales = CalculationUtils.calculateOrderTotals(
+      validatedData.items,
+      validatedData.descuento,
+      validatedData.impuestos
+    );
     
     const presupuesto = await prisma.presupuesto.create({
       data: {
@@ -111,10 +118,10 @@ export async function POST(req: NextRequest) {
         condicionesPago: validatedData.condicionesPago,
         tiempoEntrega: validatedData.tiempoEntrega,
         validezDias: validatedData.validezDias,
-        subtotal,
+        subtotal: totales.subtotal,
         descuento: validatedData.descuento,
         impuestos: validatedData.impuestos,
-        total,
+        total: totales.total,
         moneda: validatedData.moneda,
         userId: user.id,
         items: {
@@ -126,7 +133,11 @@ export async function POST(req: NextRequest) {
             unidad: item.unidad,
             precioUnitario: item.precioUnitario,
             descuento: item.descuento,
-            total: item.cantidad * item.precioUnitario * (1 - (item.descuento || 0) / 100)
+            total: CalculationUtils.calculateItemTotal(
+              item.cantidad, 
+              item.precioUnitario, 
+              item.descuento
+            )
           }))
         }
       },
@@ -137,12 +148,27 @@ export async function POST(req: NextRequest) {
     });
     
     return NextResponse.json(presupuesto, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al crear presupuesto:', error);
+    
+    // Manejar errores de autenticación
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
+    if (error.errors) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: error.errors },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al crear presupuesto' },
       { status: 500 }
     );
   }
 }
-

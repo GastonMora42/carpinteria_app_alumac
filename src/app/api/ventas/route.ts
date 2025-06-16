@@ -1,16 +1,14 @@
-// ===================================
-
-// src/app/api/ventas/route.ts
+// src/app/api/ventas/route.ts - CORREGIDO
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { ventaSchema } from '@/lib/validations/venta';
-import { verifyAuth } from '@/lib/auth/verify';
+import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
 
 // GET - Listar ventas/pedidos
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    await verifyAuth(token);
+    // CORREGIDO: Usar verifyCognitoAuth en lugar de verifyAuth
+    const user = await verifyCognitoAuth(req);
     
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -75,8 +73,17 @@ export async function GET(req: NextRequest) {
         limit
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al obtener ventas:', error);
+    
+    // Manejar errores de autenticación
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al obtener ventas' },
       { status: 500 }
@@ -87,8 +94,8 @@ export async function GET(req: NextRequest) {
 // POST - Crear nueva venta
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('token')?.value;
-    const user = await verifyAuth(token);
+    // CORREGIDO: Usar verifyCognitoAuth en lugar de verifyAuth
+    const user = await verifyCognitoAuth(req);
     
     const body = await req.json();
     const validatedData = ventaSchema.parse(body);
@@ -132,12 +139,27 @@ export async function POST(req: NextRequest) {
     });
     
     return NextResponse.json(pedido, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al crear venta:', error);
+    
+    // Manejar errores de autenticación
+    if (error.message.includes('Token') || error.message.includes('autenticación')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
+    if (error.errors) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: error.errors },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Error al crear venta' },
       { status: 500 }
     );
   }
 }
-
