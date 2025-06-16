@@ -17,7 +17,7 @@ import {
   HiOutlineMail
 } from 'react-icons/hi';
 
-export function InventarioAlertasPage() {
+export default function InventarioAlertasPage() {
   const { materials, loading, error, refetch } = useMaterials();
 
   // Filtrar materiales con stock crítico o bajo
@@ -275,5 +275,3 @@ export function InventarioAlertasPage() {
     </div>
   );
 }
-
-export default InventarioAlertasPage;
