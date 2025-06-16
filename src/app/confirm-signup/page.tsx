@@ -1,7 +1,7 @@
-// src/app/confirm-signup/page.tsx
+// src/app/confirm-signup/page.tsx - CORREGIDO PARA VERCEL DEPLOY
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HiOutlineExclamationCircle, HiOutlineCheckCircle } from 'react-icons/hi';
 
-export default function ConfirmSignUpPage() {
+// Componente separado que usa useSearchParams
+function ConfirmSignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email');
@@ -25,7 +26,6 @@ export default function ConfirmSignUpPage() {
     setIsLoading(true);
     setError(null);
     setSuccess(null);
-    
 
     try {
       const response = await fetch('/api/auth/confirm-signup', {
@@ -55,89 +55,125 @@ export default function ConfirmSignUpPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">
-            Confirmar Cuenta
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Revisa tu email y ingresa el código de confirmación
-          </p>
-        </div>
-
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-center text-xl">Código de Verificación</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <div className="mb-4 rounded-md bg-red-50 p-4">
-                <div className="flex">
-                  <HiOutlineExclamationCircle className="h-5 w-5 text-red-400" />
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">{error}</h3>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {success && (
-              <div className="mb-4 rounded-md bg-green-50 p-4">
-                <div className="flex">
-                  <HiOutlineCheckCircle className="h-5 w-5 text-green-400" />
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">{success}</h3>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              <div>
-                <Input
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={!!emailParam}
-                  required
-                />
-              </div>
-
-              <div>
-                <Input
-                  label="Código de verificación"
-                  type="text"
-                  placeholder="123456"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  maxLength={6}
-                  required
-                />
-              </div>
-
-              <div>
-                <Button
-                  type="submit"
-                  loading={isLoading}
-                  className="w-full"
-                  size="lg"
-                  disabled={!!success}
-                >
-                  {isLoading ? 'Confirmando...' : 'Confirmar Cuenta'}
-                </Button>
-              </div>
-            </form>
-
-            <div className="mt-6 text-center">
-              <Link href="/login" className="text-blue-600 hover:text-blue-500 text-sm">
-                Volver al login
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="max-w-md w-full space-y-8">
+      <div className="text-center">
+        <h2 className="text-3xl font-extrabold text-gray-900">
+          Confirmar Cuenta
+        </h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Revisa tu email y ingresa el código de confirmación
+        </p>
       </div>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-center text-xl">Código de Verificación</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="mb-4 rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <HiOutlineExclamationCircle className="h-5 w-5 text-red-400" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 rounded-md bg-green-50 p-4">
+              <div className="flex">
+                <HiOutlineCheckCircle className="h-5 w-5 text-green-400" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">{success}</h3>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div>
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={!!emailParam}
+                required
+              />
+            </div>
+
+            <div>
+              <Input
+                label="Código de verificación"
+                type="text"
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                maxLength={6}
+                required
+              />
+            </div>
+
+            <div>
+              <Button
+                type="submit"
+                loading={isLoading}
+                className="w-full"
+                size="lg"
+                disabled={!!success}
+              >
+                {isLoading ? 'Confirmando...' : 'Confirmar Cuenta'}
+              </Button>
+            </div>
+          </form>
+
+          <div className="mt-6 text-center">
+            <Link href="/login" className="text-blue-600 hover:text-blue-500 text-sm">
+              Volver al login
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Componente de carga para el Suspense
+function LoadingFallback() {
+  return (
+    <div className="max-w-md w-full space-y-8">
+      <div className="text-center">
+        <h2 className="text-3xl font-extrabold text-gray-900">
+          Confirmar Cuenta
+        </h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Cargando...
+        </p>
+      </div>
+      <Card className="shadow-lg">
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Componente principal de la página
+export default function ConfirmSignUpPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+      <Suspense fallback={<LoadingFallback />}>
+        <ConfirmSignUpForm />
+      </Suspense>
     </div>
   );
 }
