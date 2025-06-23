@@ -492,3 +492,31 @@ model Configuracion {
   
   @@map("configuracion")
 }
+
+model MovimientoInventario {
+  id            String    @id @default(uuid())
+  materialId    String
+  tipo          TipoMovimiento
+  cantidad      Decimal   @db.Decimal(10, 3)
+  stockAnterior Decimal   @db.Decimal(10, 3)
+  stockNuevo    Decimal   @db.Decimal(10, 3)
+  motivo        String
+  referencia    String?
+  fecha         DateTime  @default(now())
+  userId        String
+  
+  // Relaciones
+  material      Material  @relation(fields: [materialId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@map("movimientos_inventario")
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}

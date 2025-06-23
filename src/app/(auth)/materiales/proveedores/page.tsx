@@ -2,38 +2,37 @@
 'use client';
 
 import { useState } from 'react';
-import { useProveedores } from '@/hooks/use-materials';
+import { useProveedores, useMaterials } from '@/hooks/use-materials';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Modal } from '@/components/ui/modal';
 import { Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow } from '@/components/ui/table';
-import { DateUtils } from '@/lib/utils/calculations';
 import { ProveedorFormData, proveedorSchema } from '@/lib/validations/material';
+import { ValidationUtils } from '@/lib/utils/validators';
 import {
   HiOutlineSearch,
   HiOutlinePlus,
   HiOutlineEye,
   HiOutlinePencil,
   HiOutlineTrash,
-  HiOutlineTruck,
   HiOutlineExclamationCircle,
+  HiOutlineOfficeBuilding,
   HiOutlinePhone,
   HiOutlineMail,
-  HiOutlineLocationMarker,
-  HiOutlineDownload,
-  HiOutlineClipboardList,
-  HiOutlineOfficeBuilding
+  HiOutlineLocationMarker
 } from 'react-icons/hi';
+import React from 'react';
 
 interface ProveedorFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ProveedorFormData) => Promise<void>;
   proveedor?: any;
+  onSubmit: (data: ProveedorFormData) => Promise<void>;
 }
 
-function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormProps) {
+function ProveedorForm({ isOpen, onClose, proveedor, onSubmit }: ProveedorFormProps) {
   const [formData, setFormData] = useState<ProveedorFormData>({
     nombre: '',
     email: '',
@@ -45,7 +44,7 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useState(() => {
+  React.useEffect(() => {
     if (proveedor) {
       setFormData({
         nombre: proveedor.nombre || '',
@@ -55,7 +54,17 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
         cuit: proveedor.cuit || '',
         notas: proveedor.notas || ''
       });
+    } else {
+      setFormData({
+        nombre: '',
+        email: '',
+        telefono: '',
+        direccion: '',
+        cuit: '',
+        notas: ''
+      });
     }
+    setErrors({});
   }, [proveedor, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,16 +76,6 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
       const validatedData = proveedorSchema.parse(formData);
       await onSubmit(validatedData);
       onClose();
-      
-      // Reset form
-      setFormData({
-        nombre: '',
-        email: '',
-        telefono: '',
-        direccion: '',
-        cuit: '',
-        notas: ''
-      });
     } catch (error: any) {
       if (error.errors) {
         const fieldErrors: Record<string, string> = {};
@@ -108,7 +107,7 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
       title={proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {errors.general && (
           <div className="rounded-md bg-red-50 p-4">
             <div className="flex">
@@ -127,8 +126,7 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
               value={formData.nombre}
               onChange={(e) => handleChange('nombre', e.target.value)}
               error={errors.nombre}
-              placeholder="Nombre del proveedor"
-              required
+              placeholder="Ej: Aluminios del Norte S.A."
             />
           </div>
 
@@ -138,7 +136,7 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
             error={errors.email}
-            placeholder="email@proveedor.com"
+            placeholder="contacto@proveedor.com"
           />
 
           <Input
@@ -155,7 +153,7 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
               value={formData.direccion}
               onChange={(e) => handleChange('direccion', e.target.value)}
               error={errors.direccion}
-              placeholder="Dirección completa"
+              placeholder="Av. Industrial 1234, Buenos Aires"
             />
           </div>
 
@@ -178,13 +176,10 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Información adicional sobre el proveedor..."
             />
-            {errors.notas && (
-              <p className="mt-1 text-sm text-red-600">{errors.notas}</p>
-            )}
           </div>
         </div>
 
-        <div className="flex justify-end space-x-3 pt-6 border-t">
+        <div className="flex justify-end space-x-3 pt-4 border-t">
           <Button variant="outline" onClick={onClose} type="button">
             Cancelar
           </Button>
@@ -200,27 +195,22 @@ function ProveedorForm({ isOpen, onClose, onSubmit, proveedor }: ProveedorFormPr
 export default function ProveedoresPage() {
   const [search, setSearch] = useState('');
   const [selectedProveedor, setSelectedProveedor] = useState<any>(null);
-  const [isProveedorModalOpen, setIsProveedorModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const { proveedores, loading, error, createProveedor, refetch } = useProveedores();
+  const { materials } = useMaterials({ proveedorId: selectedProveedor?.id });
+
+  // Filtrar proveedores por búsqueda
+  const filteredProveedores = proveedores.filter(proveedor => 
+    proveedor.nombre.toLowerCase().includes(search.toLowerCase()) ||
+    proveedor.email?.toLowerCase().includes(search.toLowerCase()) ||
+    proveedor.cuit?.includes(search)
+  );
 
   const handleCreateProveedor = async (data: ProveedorFormData) => {
     await createProveedor(data);
     refetch();
-  };
-
-  const handleUpdateProveedor = async (data: ProveedorFormData) => {
-    if (selectedProveedor) {
-      // Por ahora solo creamos, la actualización se puede implementar después
-      console.log('Update proveedor:', selectedProveedor.id, data);
-      refetch();
-    }
-  };
-
-  const openEditModal = (proveedor: any) => {
-    setSelectedProveedor(proveedor);
-    setIsProveedorModalOpen(true);
   };
 
   const openDetailModal = (proveedor: any) => {
@@ -229,25 +219,17 @@ export default function ProveedoresPage() {
   };
 
   const closeModals = () => {
-    setIsProveedorModalOpen(false);
+    setIsFormModalOpen(false);
     setIsDetailModalOpen(false);
     setSelectedProveedor(null);
   };
 
-  // Filtrar proveedores
-  const filteredProveedores = proveedores.filter(proveedor => {
-    const matchesSearch = proveedor.nombre.toLowerCase().includes(search.toLowerCase()) ||
-                         proveedor.email?.toLowerCase().includes(search.toLowerCase()) ||
-                         proveedor.telefono?.includes(search);
-    return matchesSearch;
-  });
-
   // Estadísticas
   const stats = {
-    totalProveedores: proveedores.length,
-    proveedoresActivos: proveedores.filter(p => p.activo).length,
-    totalMateriales: proveedores.reduce((acc, p) => acc + (p._count?.materiales || 0), 0),
-    proveedoresConEmail: proveedores.filter(p => p.email).length
+    total: proveedores.length,
+    activos: proveedores.filter(p => p.activo).length,
+    conMateriales: proveedores.filter(p => p._count && p._count.materiales > 0).length,
+    totalMateriales: proveedores.reduce((acc, p) => acc + (p._count?.materiales || 0), 0)
   };
 
   return (
@@ -256,18 +238,12 @@ export default function ProveedoresPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Proveedores</h1>
-          <p className="text-gray-600">Gestión de proveedores y contactos</p>
+          <p className="text-gray-600">Gestiona los proveedores de materiales</p>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline">
-            <HiOutlineDownload className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Button onClick={() => setIsProveedorModalOpen(true)}>
-            <HiOutlinePlus className="h-4 w-4 mr-2" />
-            Nuevo Proveedor
-          </Button>
-        </div>
+        <Button onClick={() => setIsFormModalOpen(true)}>
+          <HiOutlinePlus className="h-4 w-4 mr-2" />
+          Nuevo Proveedor
+        </Button>
       </div>
 
       {/* Estadísticas */}
@@ -275,10 +251,10 @@ export default function ProveedoresPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <HiOutlineTruck className="h-8 w-8 text-blue-600" />
+              <HiOutlineOfficeBuilding className="h-8 w-8 text-blue-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Total Proveedores</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalProveedores}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -287,10 +263,12 @@ export default function ProveedoresPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <HiOutlineOfficeBuilding className="h-8 w-8 text-green-600" />
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <div className="w-3 h-3 bg-green-600 rounded-full"></div>
+              </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Activos</p>
-                <p className="text-2xl font-bold text-green-600">{stats.proveedoresActivos}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.activos}</p>
               </div>
             </div>
           </CardContent>
@@ -299,10 +277,12 @@ export default function ProveedoresPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <HiOutlineClipboardList className="h-8 w-8 text-purple-600" />
+              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                <span className="text-purple-600 text-sm font-bold">M</span>
+              </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Materiales Suministrados</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.totalMateriales}</p>
+                <p className="text-sm font-medium text-gray-500">Con Materiales</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.conMateriales}</p>
               </div>
             </div>
           </CardContent>
@@ -311,10 +291,12 @@ export default function ProveedoresPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <HiOutlineMail className="h-8 w-8 text-orange-600" />
+              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span className="text-indigo-600 text-xs font-bold">#</span>
+              </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Con Email</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.proveedoresConEmail}</p>
+                <p className="text-sm font-medium text-gray-500">Total Materiales</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalMateriales}</p>
               </div>
             </div>
           </CardContent>
@@ -324,20 +306,21 @@ export default function ProveedoresPage() {
       {/* Filtros */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative md:col-span-2">
-              <HiOutlineSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Buscar proveedores por nombre, email o teléfono..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <HiOutlineSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, email o CUIT..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
-
-            <Button variant="outline" onClick={refetch} className="w-full">
-              Actualizar Lista
+            <Button variant="outline" onClick={refetch}>
+              Actualizar
             </Button>
           </div>
         </CardContent>
@@ -361,7 +344,7 @@ export default function ProveedoresPage() {
             </div>
           ) : filteredProveedores.length === 0 ? (
             <div className="text-center py-12">
-              <HiOutlineTruck className="mx-auto h-12 w-12 text-gray-400" />
+              <HiOutlineOfficeBuilding className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No hay proveedores</h3>
               <p className="mt-1 text-sm text-gray-500">
                 {search ? 'No se encontraron proveedores con esos criterios' : 'Comienza agregando tu primer proveedor'}
@@ -373,7 +356,7 @@ export default function ProveedoresPage() {
                 <TableRow>
                   <TableHeaderCell>Proveedor</TableHeaderCell>
                   <TableHeaderCell>Contacto</TableHeaderCell>
-                  <TableHeaderCell>Ubicación</TableHeaderCell>
+                  <TableHeaderCell>CUIT</TableHeaderCell>
                   <TableHeaderCell>Materiales</TableHeaderCell>
                   <TableHeaderCell>Estado</TableHeaderCell>
                   <TableHeaderCell>Acciones</TableHeaderCell>
@@ -386,48 +369,44 @@ export default function ProveedoresPage() {
                       <div>
                         <div className="font-medium text-gray-900">{proveedor.nombre}</div>
                         <div className="text-sm text-gray-500">{proveedor.codigo}</div>
-                        {proveedor.cuit && (
-                          <div className="text-xs text-gray-400">CUIT: {proveedor.cuit}</div>
-                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
                         {proveedor.email && (
-                          <div className="flex items-center text-sm text-gray-900">
-                            <HiOutlineMail className="h-4 w-4 mr-1 text-gray-400" />
+                          <div className="flex items-center text-sm text-gray-600">
+                            <HiOutlineMail className="h-3 w-3 mr-1" />
                             {proveedor.email}
                           </div>
                         )}
                         {proveedor.telefono && (
-                          <div className="flex items-center text-sm text-gray-500">
-                            <HiOutlinePhone className="h-4 w-4 mr-1 text-gray-400" />
+                          <div className="flex items-center text-sm text-gray-600">
+                            <HiOutlinePhone className="h-3 w-3 mr-1" />
                             {proveedor.telefono}
+                          </div>
+                        )}
+                        {proveedor.direccion && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <HiOutlineLocationMarker className="h-3 w-3 mr-1" />
+                            <span className="truncate max-w-xs">{proveedor.direccion}</span>
                           </div>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {proveedor.direccion ? (
-                        <div className="flex items-center text-sm text-gray-900">
-                          <HiOutlineLocationMarker className="h-4 w-4 mr-1 text-gray-400" />
-                          <span className="max-w-xs truncate">{proveedor.direccion}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">Sin dirección</span>
-                      )}
+                      <span className="text-sm text-gray-900">
+                        {proveedor.cuit || '-'}
+                      </span>
                     </TableCell>
                     <TableCell>
-                      <div className="text-center">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {proveedor._count?.materiales || 0} materiales
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {proveedor._count?.materiales || 0} materiales
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                         proveedor.activo 
-                          ? 'bg-green-100 text-green-800' 
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
                         {proveedor.activo ? 'Activo' : 'Inactivo'}
@@ -445,30 +424,13 @@ export default function ProveedoresPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => openEditModal(proveedor)}
+                          onClick={() => {
+                            setSelectedProveedor(proveedor);
+                            setIsFormModalOpen(true);
+                          }}
                         >
                           <HiOutlinePencil className="h-4 w-4" />
                         </Button>
-                        {proveedor.email && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(`mailto:${proveedor.email}`)}
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            <HiOutlineMail className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {proveedor.telefono && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(`tel:${proveedor.telefono}`)}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <HiOutlinePhone className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -479,12 +441,12 @@ export default function ProveedoresPage() {
         </CardContent>
       </Card>
 
-      {/* Modals */}
+      {/* Modal de formulario */}
       <ProveedorForm
-        isOpen={isProveedorModalOpen}
+        isOpen={isFormModalOpen}
         onClose={closeModals}
-        onSubmit={selectedProveedor ? handleUpdateProveedor : handleCreateProveedor}
         proveedor={selectedProveedor}
+        onSubmit={handleCreateProveedor}
       />
 
       {/* Modal de detalle */}
@@ -493,84 +455,102 @@ export default function ProveedoresPage() {
           isOpen={isDetailModalOpen}
           onClose={closeModals}
           title={`Detalle: ${selectedProveedor.nombre}`}
-          size="lg"
+          size="xl"
         >
           <div className="space-y-6">
             {/* Información del proveedor */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Información del Proveedor</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Nombre</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.nombre}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Código</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.codigo}</p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nombre</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedProveedor.nombre}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Código</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedProveedor.codigo}</p>
+              </div>
+              {selectedProveedor.email && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.email || 'No especificado'}</p>
+                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.email}</p>
                 </div>
+              )}
+              {selectedProveedor.telefono && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Teléfono</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.telefono || 'No especificado'}</p>
+                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.telefono}</p>
                 </div>
+              )}
+              {selectedProveedor.direccion && (
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Dirección</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.direccion || 'No especificada'}</p>
+                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.direccion}</p>
                 </div>
+              )}
+              {selectedProveedor.cuit && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">CUIT</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.cuit || 'No especificado'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Estado</label>
-                  <p className="mt-1">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedProveedor.activo 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedProveedor.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              {selectedProveedor.notas && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700">Notas</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.notas}</p>
+                  <p className="mt-1 text-sm text-gray-900">{selectedProveedor.cuit}</p>
                 </div>
               )}
             </div>
 
-            {/* Estadísticas */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Estadísticas</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Materiales Suministrados</label>
-                  <p className="mt-1 text-2xl font-bold text-blue-600">
-                    {selectedProveedor._count?.materiales || 0}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Registrado Desde</label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {DateUtils.formatDate(selectedProveedor.createdAt)}
-                  </p>
+            {/* Materiales del proveedor */}
+            {materials && materials.length > 0 && (
+              <div>
+                <h4 className="text-lg font-medium text-gray-900 mb-4">
+                  Materiales ({materials.length})
+                </h4>
+                <div className="max-h-64 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHeaderCell>Material</TableHeaderCell>
+                        <TableHeaderCell>Tipo</TableHeaderCell>
+                        <TableHeaderCell>Precio</TableHeaderCell>
+                        <TableHeaderCell>Stock</TableHeaderCell>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {materials.map((material) => (
+                        <TableRow key={material.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium text-gray-900">{material.nombre}</div>
+                              <div className="text-sm text-gray-500">{material.codigo}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-900">{material.tipo}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-900">
+                              ${material.precioUnitario.toLocaleString()} / {material.unidadMedida}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`text-sm ${
+                              material.stockActual <= material.stockMinimo 
+                                ? 'text-red-600 font-medium'
+                                : 'text-gray-900'
+                            }`}>
+                              {material.stockActual} {material.unidadMedida}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end space-x-3 pt-6 border-t">
               <Button variant="outline" onClick={closeModals}>
                 Cerrar
               </Button>
               <Button onClick={() => {
-                closeModals();
-                openEditModal(selectedProveedor);
+                setIsDetailModalOpen(false);
+                setIsFormModalOpen(true);
               }}>
                 Editar Proveedor
               </Button>
