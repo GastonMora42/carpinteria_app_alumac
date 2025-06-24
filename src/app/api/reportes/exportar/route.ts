@@ -347,26 +347,7 @@ export async function GET(req: NextRequest) {
     const finalFileName = `${fileName}.${fileExtension}`;
     
     console.log(`✅ Exportación completada: ${finalFileName} (${data.length} registros)`);
-
-    // Registrar en historial (opcional)
-    try {
-      await prisma.exportHistory?.create({
-        data: {
-          type: tipo,
-          format: formato,
-          fileName: finalFileName,
-          fileSize: fileBuffer.length,
-          status: 'completed',
-          userId: user.id
-        }
-      }).catch(() => {
-        // Si la tabla no existe, ignorar
-        console.log('Tabla de historial no encontrada, continuando...');
-      });
-    } catch (error) {
-      // Ignorar errores de historial
-    }
-
+    
     // Retornar archivo
     return new NextResponse(fileBuffer, {
       status: 200,

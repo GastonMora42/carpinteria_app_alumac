@@ -141,7 +141,12 @@ export default function AnalisisFinancieroPage() {
 
   const exportAnalisis = async () => {
     try {
-      const response = await fetch(`/api/reportes/financiero/export?${new URLSearchParams(filters)}`, {
+      const searchParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        searchParams.append(key, value.toString());
+      });
+
+      const response = await fetch(`/api/reportes/financiero/export?${searchParams}`, {
         credentials: 'include'
       });
 

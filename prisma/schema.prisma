@@ -31,6 +31,8 @@ model User {
   pedidos          Pedido[]
   transacciones    Transaccion[]
   gastosGenerales  GastoGeneral[]
+  // AGREGAR ESTA LÍNEA:
+  movimientosInventario MovimientoInventario[]
   
   @@map("users")
 }
@@ -109,6 +111,8 @@ model Material {
   proveedor       Proveedor         @relation(fields: [proveedorId], references: [id])
   materialPedido  MaterialPedido[]
   materialPresupuesto MaterialPresupuesto[]
+  // AGREGAR ESTA LÍNEA:
+  movimientosInventario MovimientoInventario[]
   
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
