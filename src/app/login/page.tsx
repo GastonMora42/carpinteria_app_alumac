@@ -127,7 +127,7 @@ function LoginForm() {
             className="mx-auto mb-4"
           />
           <p className="mt-2 text-sm text-gray-600">
-            Sistema de Gestión para Carpintería de Aluminio
+            Sistema de Gestión para Carpintería de Aluminio AZIFE
           </p>
         </div>
       </div>
@@ -256,7 +256,7 @@ function LoginForm() {
 
       {/* Footer */}
       <div className="text-center text-xs text-gray-500">
-        <p>© 2024 AlumGestión. Todos los derechos reservados.</p>
+        <p>© 2024 AZIFE. Todos los derechos reservados.</p>
         <p className="mt-1">Autenticación segura con AWS Cognito.</p>
       </div>
     </div>
@@ -272,7 +272,7 @@ function LoadingFallback() {
           <span className="text-gray-400 text-2xl font-bold">AG</span>
         </div>
         <h2 className="text-3xl font-extrabold text-gray-900">
-          AlumGestión
+        AZIFE
         </h2>
         <p className="mt-2 text-sm text-gray-600">
           Cargando...

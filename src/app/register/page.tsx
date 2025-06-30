@@ -251,7 +251,7 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">
-          <p>© 2025 AlumGestión.</p>
+          <p>© 2025 AZIFE.</p>
           <p className="mt-1">Autenticación segura con AWS Cognito.</p>
         </div>
       </div>

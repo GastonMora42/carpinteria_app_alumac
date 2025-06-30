@@ -40,7 +40,7 @@ export default function HomePage() {
             <div className="mb-6">
               <div className="w-20 h-0.5 bg-gradient-to-r from-blue-500 to-slate-500 mx-auto mb-4 rounded-full"></div>
               <h1 className="text-3xl font-extrabold text-slate-700 mb-2 tracking-tight">
-                ALUMAC Sistema integral
+                AZIFE Sistema integral
               </h1>
               <p className="text-xl text-slate-500 font-light">
                 Sistema de Gestión para <br className="sm:hidden" /> Carpintería de Aluminio
@@ -86,7 +86,7 @@ export default function HomePage() {
       <div className="absolute bottom-6 left-0 right-0">
         <div className="text-center">
           <p className="text-slate-400 text-sm font-light tracking-wide">
-            © {new Date().getFullYear()} ALUMAC Sistema integral
+            © {new Date().getFullYear()} AZIFE Sistema integral
             • Solución empresarial
           </p>
         </div>
