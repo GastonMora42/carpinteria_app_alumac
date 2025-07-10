@@ -1,7 +1,34 @@
-// ===================================
-
-// src/lib/validations/venta.ts
+// src/lib/validations/venta.ts - ACTUALIZADO CON ITEMS
 import { z } from 'zod';
+
+export const itemVentaSchema = z.object({
+  descripcion: z.string()
+    .min(1, "La descripción es requerida")
+    .max(200, "La descripción no puede exceder 200 caracteres"),
+  
+  detalle: z.string()
+    .max(500, "El detalle no puede exceder 500 caracteres")
+    .optional()
+    .or(z.literal("")),
+  
+  cantidad: z.number()
+    .min(0.001, "La cantidad debe ser mayor a 0")
+    .max(999999, "La cantidad es demasiado grande"),
+  
+  unidad: z.string()
+    .min(1, "La unidad es requerida")
+    .max(20, "La unidad no puede exceder 20 caracteres"),
+  
+  precioUnitario: z.number()
+    .min(0.01, "El precio debe ser mayor a 0")
+    .max(9999999.99, "El precio es demasiado alto"),
+  
+  descuento: z.number()
+    .min(0, "El descuento no puede ser negativo")
+    .max(100, "El descuento no puede ser mayor a 100%")
+    .optional()
+    .default(0)
+});
 
 export const ventaSchema = z.object({
   clienteId: z.string()
@@ -12,7 +39,6 @@ export const ventaSchema = z.object({
     .optional(),
   
   fechaEntrega: z.date()
-    .min(new Date(), "La fecha de entrega debe ser futura")
     .optional(),
   
   prioridad: z.enum(['BAJA', 'NORMAL', 'ALTA', 'URGENTE'])
@@ -50,10 +76,24 @@ export const ventaSchema = z.object({
     .default(0),
   
   moneda: z.enum(['PESOS', 'DOLARES'])
-    .default('PESOS')
+    .default('PESOS'),
+
+  // NUEVO: Items para ventas directas
+  items: z.array(itemVentaSchema)
+    .optional()
+    .default([])
+}).refine((data) => {
+  // Si no hay presupuesto, debe tener al menos un item
+  if (!data.presupuestoId && (!data.items || data.items.length === 0)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Las ventas directas deben incluir al menos un item",
+  path: ["items"]
 });
 
 export const ventaUpdateSchema = ventaSchema.partial();
 
 export type VentaFormData = z.infer<typeof ventaSchema>;
-
+export type ItemVentaFormData = z.infer<typeof itemVentaSchema>;

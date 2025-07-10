@@ -263,11 +263,33 @@ model Pedido {
   materiales        MaterialPedido[]
   transacciones     Transaccion[]
   gastos            GastoPedido[]
+  items           ItemPedido[]
   
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   
   @@map("pedidos")
+}
+
+model ItemPedido {
+  id              String      @id @default(uuid())
+  pedidoId        String
+  orden           Int         // Para ordenar los items
+  descripcion     String
+  detalle         String?
+  cantidad        Decimal     @db.Decimal(10, 3)
+  unidad          String      // "m2", "metro", "unidad"
+  precioUnitario  Decimal     @db.Decimal(10, 2)
+  descuento       Decimal?    @db.Decimal(5, 2) @default(0) // Porcentaje
+  total           Decimal     @db.Decimal(12, 2)
+  
+  // Relaciones
+  pedido          Pedido      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("items_pedido")
 }
 
 enum EstadoPedido {
