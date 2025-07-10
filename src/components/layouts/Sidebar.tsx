@@ -37,8 +37,6 @@ const navigation = [
     submenu: [
       { name: 'Todos', href: '/presupuestos' },
       { name: 'Nuevo Presupuesto', href: '/presupuestos/nuevo' },
-      { name: 'Pendientes', href: '/presupuestos/pendientes' },
-      { name: 'Vencidos', href: '/presupuestos/vencidos' }
     ]
   },
   { 
@@ -47,7 +45,6 @@ const navigation = [
     icon: HiOutlineUsers,
     submenu: [
       { name: 'Todos los Clientes', href: '/clientes' },
-      { name: 'Nuevo Cliente', href: '/clientes/nuevo' }
     ]
   },
   { 

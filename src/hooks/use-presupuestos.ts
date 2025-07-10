@@ -1,4 +1,4 @@
-// src/hooks/use-presupuestos.ts - MEJORADO CON FILTROS AVANZADOS
+// src/hooks/use-presupuestos.ts - ACTUALIZADO CON VALIDACIÓN DE NÚMERO
 import { useState, useEffect } from 'react';
 import { PresupuestoFormData } from '@/lib/validations/presupuesto';
 import { api } from '@/lib/utils/http';
@@ -10,9 +10,9 @@ interface UsePresupuestosParams {
   estado?: string;
   clienteId?: string;
   search?: string;
-  numero?: string; // Nuevo: filtro específico por número
-  fechaDesde?: string; // Nuevo: filtro por fecha desde
-  fechaHasta?: string; // Nuevo: filtro por fecha hasta
+  numero?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
 }
 
 export function usePresupuestos(params: UsePresupuestosParams = {}) {
@@ -68,6 +68,7 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
   const createPresupuesto = async (presupuestoData: PresupuestoFormData): Promise<PresupuestoWithNumbers> => {
     try {
       console.log('➕ Creating presupuesto:', presupuestoData.descripcionObra);
+      console.log('📋 With number:', presupuestoData.numero || 'auto-generate');
       
       const newPresupuesto = await api.post('/api/presupuestos', presupuestoData);
       
@@ -147,6 +148,43 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
     }
   };
 
+  // NUEVO: Función para generar número sugerido
+  const generateSuggestedNumber = async (): Promise<string> => {
+    try {
+      console.log('🔢 Generating suggested number...');
+      
+      const data = await api.get('/api/presupuestos/generar-numero');
+      
+      console.log('✅ Suggested number generated:', data.numero);
+      return data.numero;
+    } catch (err: any) {
+      console.error('❌ Error generating suggested number:', err);
+      throw new Error(err.message || 'Error al generar número sugerido');
+    }
+  };
+
+  // NUEVO: Función para validar disponibilidad de número
+  const validateNumber = async (numero: string): Promise<{ available: boolean; message: string }> => {
+    try {
+      console.log('🔍 Validating number availability:', numero);
+      
+      const data = await api.post('/api/presupuestos/generar-numero', { numero });
+      
+      console.log(`${data.available ? '✅' : '❌'} Number validation result:`, data.message);
+      
+      return {
+        available: data.available,
+        message: data.message
+      };
+    } catch (err: any) {
+      console.error('❌ Error validating number:', err);
+      return {
+        available: false,
+        message: 'Error al validar número'
+      };
+    }
+  };
+
   // Función para obtener estadísticas de presupuestos
   const getEstadisticas = () => {
     const total = presupuestos.length;
@@ -186,7 +224,9 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
     createPresupuesto,
     updatePresupuesto,
     convertirAVenta,
-    findByNumero
+    findByNumero,
+    generateSuggestedNumber, // NUEVO
+    validateNumber // NUEVO
   };
 }
 
@@ -275,5 +315,52 @@ export function usePresupuestoSearch() {
     searchResults,
     searching,
     clearResults: () => setSearchResults([])
+  };
+}
+
+// NUEVO: Hook para validación de números en tiempo real
+export function useNumberValidation() {
+  const [validationResult, setValidationResult] = useState<{
+    isChecking: boolean;
+    isValid: boolean;
+    message: string;
+  }>({
+    isChecking: false,
+    isValid: true,
+    message: ''
+  });
+
+  const validateNumber = async (numero: string) => {
+    if (!numero.trim()) {
+      setValidationResult({
+        isChecking: false,
+        isValid: true,
+        message: ''
+      });
+      return;
+    }
+
+    setValidationResult(prev => ({ ...prev, isChecking: true }));
+
+    try {
+      const data = await api.post('/api/presupuestos/generar-numero', { numero: numero.trim() });
+      
+      setValidationResult({
+        isChecking: false,
+        isValid: data.available,
+        message: data.message
+      });
+    } catch (error: any) {
+      setValidationResult({
+        isChecking: false,
+        isValid: false,
+        message: 'Error al validar número'
+      });
+    }
+  };
+
+  return {
+    validationResult,
+    validateNumber
   };
 }

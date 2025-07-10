@@ -1,4 +1,4 @@
-// src/lib/validations/presupuesto.ts - CORREGIDO PARA MANEJAR FECHAS
+// src/lib/validations/presupuesto.ts - ACTUALIZADO CON NÚMERO MANUAL
 import { z } from 'zod';
 
 // Helper para transformar strings de fecha a Date objects
@@ -41,10 +41,16 @@ export const itemPresupuestoSchema = z.object({
 });
 
 export const presupuestoSchema = z.object({
+  // NUEVO: Campo opcional para número manual
+  numero: z.string()
+    .min(1, "El número no puede estar vacío")
+    .max(50, "El número no puede exceder 50 caracteres")
+    .regex(/^[A-Z0-9\-_]+$/i, "El número solo puede contener letras, números, guiones y guiones bajos")
+    .optional(),
+  
   clienteId: z.string()
     .uuid("ID de cliente inválido"),
   
-  // CORREGIDO: Usar dateTransform para manejar tanto strings como dates
   fechaValidez: dateTransform.refine((date) => {
     return date > new Date();
   }, "La fecha de validez debe ser futura"),

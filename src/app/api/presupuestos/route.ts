@@ -1,4 +1,4 @@
-// src/app/api/presupuestos/route.ts - MEJORADO CON NUMERACIÓN ROBUSTA
+// src/app/api/presupuestos/route.ts - ACTUALIZADO PARA NÚMERO MANUAL
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { presupuestoSchema } from '@/lib/validations/presupuesto';
@@ -62,6 +62,15 @@ async function generatePresupuestoNumber(): Promise<string> {
   throw new Error('No se pudo generar número de presupuesto después de varios intentos');
 }
 
+// Función para validar que un número manual no esté en uso
+async function validateUniqueNumber(numero: string): Promise<boolean> {
+  const existing = await prisma.presupuesto.findUnique({
+    where: { numero },
+    select: { id: true }
+  });
+  return !existing;
+}
+
 // GET - Listar presupuestos con filtros mejorados
 export async function GET(req: NextRequest) {
   try {
@@ -73,7 +82,7 @@ export async function GET(req: NextRequest) {
     const estado = searchParams.get('estado');
     const clienteId = searchParams.get('clienteId');
     const search = searchParams.get('search');
-    const numero = searchParams.get('numero'); // Nuevo: búsqueda específica por número
+    const numero = searchParams.get('numero');
     const fechaDesde = searchParams.get('fechaDesde');
     const fechaHasta = searchParams.get('fechaHasta');
     
@@ -183,7 +192,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Crear nuevo presupuesto con número único
+// POST - Crear nuevo presupuesto con número manual
 export async function POST(req: NextRequest) {
   try {
     const user = await verifyCognitoAuth(req);
@@ -192,10 +201,26 @@ export async function POST(req: NextRequest) {
     const validatedData = presupuestoSchema.parse(body);
     
     console.log('➕ Creating presupuesto for client:', validatedData.clienteId);
+    console.log('📋 Manual number provided:', validatedData.numero || 'No, will auto-generate');
     
-    // Generar número único de forma robusta
-    const numero = await generatePresupuestoNumber();
-    console.log('📋 Generated presupuesto number:', numero);
+    let numero: string;
+    
+    // Si se proporcionó un número manual, validarlo
+    if (validatedData.numero) {
+      const isUnique = await validateUniqueNumber(validatedData.numero);
+      if (!isUnique) {
+        return NextResponse.json(
+          { error: `El número "${validatedData.numero}" ya está en uso. Elige otro número.` },
+          { status: 409 }
+        );
+      }
+      numero = validatedData.numero;
+      console.log('📋 Using manual number:', numero);
+    } else {
+      // Generar número automáticamente
+      numero = await generatePresupuestoNumber();
+      console.log('📋 Generated automatic number:', numero);
+    }
     
     // Calcular totales usando la utilidad
     const totales = CalculationUtils.calculateOrderTotals(
@@ -254,7 +279,8 @@ export async function POST(req: NextRequest) {
       id: presupuesto.id,
       numero: presupuesto.numero,
       total: presupuesto.total,
-      itemsCount: presupuesto.items.length
+      itemsCount: presupuesto.items.length,
+      isManualNumber: !!validatedData.numero
     });
     
     return NextResponse.json(presupuesto, { status: 201 });
@@ -272,7 +298,7 @@ export async function POST(req: NextRequest) {
       // Error de número duplicado
       console.error('❌ Duplicate presupuesto number');
       return NextResponse.json(
-        { error: 'Error al generar número de presupuesto. Intente nuevamente.' },
+        { error: 'El número de presupuesto ya existe. Elige otro número.' },
         { status: 409 }
       );
     }
