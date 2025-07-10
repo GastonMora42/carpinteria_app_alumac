@@ -1,4 +1,4 @@
-// src/hooks/use-presupuestos.ts - ACTUALIZADO
+// src/hooks/use-presupuestos.ts - MEJORADO CON FILTROS AVANZADOS
 import { useState, useEffect } from 'react';
 import { PresupuestoFormData } from '@/lib/validations/presupuesto';
 import { api } from '@/lib/utils/http';
@@ -10,6 +10,9 @@ interface UsePresupuestosParams {
   estado?: string;
   clienteId?: string;
   search?: string;
+  numero?: string; // Nuevo: filtro específico por número
+  fechaDesde?: string; // Nuevo: filtro por fecha desde
+  fechaHasta?: string; // Nuevo: filtro por fecha hasta
 }
 
 export function usePresupuestos(params: UsePresupuestosParams = {}) {
@@ -32,7 +35,7 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
       
       const searchParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
+        if (value !== undefined && value !== '') {
           searchParams.append(key, value.toString());
         }
       });
@@ -68,7 +71,11 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
       
       const newPresupuesto = await api.post('/api/presupuestos', presupuestoData);
       
-      console.log('✅ Presupuesto created successfully:', newPresupuesto.id);
+      console.log('✅ Presupuesto created successfully:', {
+        id: newPresupuesto.id,
+        numero: newPresupuesto.numero,
+        total: newPresupuesto.total
+      });
       
       // Convertir campos Decimal a number
       const convertedPresupuesto = convertDecimalFields(newPresupuesto, ['subtotal', 'descuento', 'impuestos', 'total']);
@@ -119,6 +126,51 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
     }
   };
 
+  // Función para buscar presupuesto por número específico
+  const findByNumero = async (numero: string): Promise<PresupuestoWithNumbers | null> => {
+    try {
+      console.log('🔍 Searching presupuesto by numero:', numero);
+      
+      const data = await api.get(`/api/presupuestos?numero=${encodeURIComponent(numero)}&limit=1`);
+      
+      if (data.data && data.data.length > 0) {
+        const convertedPresupuesto = convertDecimalFields(data.data[0], ['subtotal', 'descuento', 'impuestos', 'total']);
+        console.log('✅ Presupuesto found:', convertedPresupuesto.numero);
+        return convertedPresupuesto;
+      }
+      
+      console.log('❌ Presupuesto not found with numero:', numero);
+      return null;
+    } catch (err: any) {
+      console.error('❌ Error searching presupuesto by numero:', err);
+      throw new Error(err.message || 'Error al buscar presupuesto');
+    }
+  };
+
+  // Función para obtener estadísticas de presupuestos
+  const getEstadisticas = () => {
+    const total = presupuestos.length;
+    const pendientes = presupuestos.filter(p => ['PENDIENTE', 'ENVIADO'].includes(p.estado)).length;
+    const aprobados = presupuestos.filter(p => p.estado === 'APROBADO').length;
+    const convertidos = presupuestos.filter(p => p.estado === 'CONVERTIDO').length;
+    const vencidos = presupuestos.filter(p => p.estado === 'VENCIDO').length;
+    const montoTotal = presupuestos.reduce((acc, p) => acc + p.total, 0);
+    const montoPendiente = presupuestos
+      .filter(p => ['PENDIENTE', 'ENVIADO', 'APROBADO'].includes(p.estado))
+      .reduce((acc, p) => acc + p.total, 0);
+
+    return {
+      total,
+      pendientes,
+      aprobados,
+      convertidos,
+      vencidos,
+      montoTotal,
+      montoPendiente,
+      tasaConversion: total > 0 ? (convertidos / total) * 100 : 0
+    };
+  };
+
   useEffect(() => {
     console.log('🔄 usePresupuestos effect triggered:', params);
     fetchPresupuestos();
@@ -129,9 +181,99 @@ export function usePresupuestos(params: UsePresupuestosParams = {}) {
     loading,
     error,
     pagination,
+    estadisticas: getEstadisticas(),
     refetch: fetchPresupuestos,
     createPresupuesto,
     updatePresupuesto,
-    convertirAVenta
+    convertirAVenta,
+    findByNumero
+  };
+}
+
+// Hook específico para obtener un presupuesto por ID
+export function usePresupuesto(id: string | null) {
+  const [presupuesto, setPresupuesto] = useState<PresupuestoWithNumbers | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchPresupuesto = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log('🔍 Fetching presupuesto:', id);
+        
+        const data = await api.get(`/api/presupuestos/${id}`);
+        
+        console.log('✅ Presupuesto fetched successfully:', data.numero);
+        
+        const convertedPresupuesto = convertDecimalFields(data, ['subtotal', 'descuento', 'impuestos', 'total']);
+        setPresupuesto(convertedPresupuesto);
+      } catch (err: any) {
+        console.error('❌ Error fetching presupuesto:', err);
+        setError(err.message || 'Error al cargar presupuesto');
+        
+        if (err.message?.includes('404')) {
+          setError('Presupuesto no encontrado');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPresupuesto();
+  }, [id]);
+
+  return { presupuesto, loading, error };
+}
+
+// Hook para buscar presupuestos con debounce
+export function usePresupuestoSearch() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<PresupuestoWithNumbers[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const search = async (term: string) => {
+    if (!term || term.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearching(true);
+      
+      const data = await api.get(`/api/presupuestos?search=${encodeURIComponent(term)}&limit=10`);
+      
+      const convertedResults = (data.data || []).map((presupuesto: any) => 
+        convertDecimalFields(presupuesto, ['subtotal', 'descuento', 'impuestos', 'total'])
+      );
+      
+      setSearchResults(convertedResults);
+    } catch (err: any) {
+      console.error('❌ Error searching presupuestos:', err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      search(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  return {
+    searchTerm,
+    setSearchTerm,
+    searchResults,
+    searching,
+    clearResults: () => setSearchResults([])
   };
 }

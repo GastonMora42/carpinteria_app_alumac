@@ -1,14 +1,70 @@
-// src/app/api/presupuestos/route.ts - CORREGIDO
+// src/app/api/presupuestos/route.ts - MEJORADO CON NUMERACIÓN ROBUSTA
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { presupuestoSchema } from '@/lib/validations/presupuesto';
 import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
 import { CalculationUtils } from '@/lib/utils/calculations';
 
-// GET - Listar presupuestos con filtros
+// Función para generar número único de presupuesto
+async function generatePresupuestoNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const maxRetries = 5;
+  
+  for (let retry = 0; retry < maxRetries; retry++) {
+    try {
+      // Obtener el último número del año actual
+      const lastPresupuesto = await prisma.presupuesto.findFirst({
+        where: {
+          numero: {
+            startsWith: `PRES-${year}-`
+          }
+        },
+        orderBy: {
+          numero: 'desc'
+        },
+        select: {
+          numero: true
+        }
+      });
+
+      let nextNumber = 1;
+      
+      if (lastPresupuesto) {
+        // Extraer el número del formato PRES-YYYY-XXX
+        const match = lastPresupuesto.numero.match(/PRES-\d{4}-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      const numero = `PRES-${year}-${String(nextNumber).padStart(3, '0')}`;
+      
+      // Verificar que no existe (por si acaso)
+      const existing = await prisma.presupuesto.findUnique({
+        where: { numero },
+        select: { id: true }
+      });
+      
+      if (!existing) {
+        return numero;
+      }
+      
+      // Si existe, incrementar y reintentar
+      nextNumber++;
+    } catch (error) {
+      console.error(`Error generating presupuesto number (retry ${retry + 1}):`, error);
+      if (retry === maxRetries - 1) {
+        throw new Error('No se pudo generar número de presupuesto único');
+      }
+    }
+  }
+  
+  throw new Error('No se pudo generar número de presupuesto después de varios intentos');
+}
+
+// GET - Listar presupuestos con filtros mejorados
 export async function GET(req: NextRequest) {
   try {
-    // CORREGIDO: Usar verifyCognitoAuth en lugar de verifyAuth
     const user = await verifyCognitoAuth(req);
     
     const { searchParams } = new URL(req.url);
@@ -17,6 +73,9 @@ export async function GET(req: NextRequest) {
     const estado = searchParams.get('estado');
     const clienteId = searchParams.get('clienteId');
     const search = searchParams.get('search');
+    const numero = searchParams.get('numero'); // Nuevo: búsqueda específica por número
+    const fechaDesde = searchParams.get('fechaDesde');
+    const fechaHasta = searchParams.get('fechaHasta');
     
     const skip = (page - 1) * limit;
     
@@ -31,13 +90,38 @@ export async function GET(req: NextRequest) {
       where.clienteId = clienteId;
     }
     
-    if (search) {
+    // Búsqueda específica por número de presupuesto
+    if (numero) {
+      where.numero = {
+        contains: numero,
+        mode: 'insensitive'
+      };
+    }
+    
+    // Filtro por rango de fechas
+    if (fechaDesde || fechaHasta) {
+      where.fechaEmision = {};
+      if (fechaDesde) {
+        where.fechaEmision.gte = new Date(fechaDesde);
+      }
+      if (fechaHasta) {
+        where.fechaEmision.lte = new Date(fechaHasta + 'T23:59:59');
+      }
+    }
+    
+    // Búsqueda general (excluye número si ya se especificó)
+    if (search && !numero) {
       where.OR = [
         { numero: { contains: search, mode: 'insensitive' } },
         { descripcionObra: { contains: search, mode: 'insensitive' } },
-        { cliente: { nombre: { contains: search, mode: 'insensitive' } } }
+        { cliente: { nombre: { contains: search, mode: 'insensitive' } } },
+        { observaciones: { contains: search, mode: 'insensitive' } }
       ];
     }
+
+    console.log('🔍 Searching presupuestos with filters:', {
+      page, limit, estado, clienteId, numero, search, fechaDesde, fechaHasta
+    });
 
     const [presupuestos, total] = await Promise.all([
       prisma.presupuesto.findMany({
@@ -49,7 +133,9 @@ export async function GET(req: NextRequest) {
           user: {
             select: { id: true, name: true }
           },
-          items: true,
+          items: {
+            orderBy: { orden: 'asc' }
+          },
           _count: {
             select: { items: true }
           }
@@ -61,6 +147,8 @@ export async function GET(req: NextRequest) {
       prisma.presupuesto.count({ where })
     ]);
 
+    console.log(`✅ Found ${presupuestos.length} presupuestos (total: ${total})`);
+
     return NextResponse.json({
       data: presupuestos,
       pagination: {
@@ -68,12 +156,19 @@ export async function GET(req: NextRequest) {
         pages: Math.ceil(total / limit),
         page,
         limit
+      },
+      filters: {
+        estado,
+        clienteId,
+        numero,
+        search,
+        fechaDesde,
+        fechaHasta
       }
     });
   } catch (error: any) {
     console.error('Error al obtener presupuestos:', error);
     
-    // Manejar errores de autenticación
     if (error.message.includes('Token') || error.message.includes('autenticación')) {
       return NextResponse.json(
         { error: 'No autorizado' },
@@ -88,18 +183,19 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Crear nuevo presupuesto
+// POST - Crear nuevo presupuesto con número único
 export async function POST(req: NextRequest) {
   try {
-    // CORREGIDO: Usar verifyCognitoAuth en lugar de verifyAuth
     const user = await verifyCognitoAuth(req);
     
     const body = await req.json();
     const validatedData = presupuestoSchema.parse(body);
     
-    // Generar número único
-    const count = await prisma.presupuesto.count();
-    const numero = `PRES-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    console.log('➕ Creating presupuesto for client:', validatedData.clienteId);
+    
+    // Generar número único de forma robusta
+    const numero = await generatePresupuestoNumber();
+    console.log('📋 Generated presupuesto number:', numero);
     
     // Calcular totales usando la utilidad
     const totales = CalculationUtils.calculateOrderTotals(
@@ -107,6 +203,8 @@ export async function POST(req: NextRequest) {
       validatedData.descuento,
       validatedData.impuestos
     );
+    
+    console.log('💰 Calculated totals:', totales);
     
     const presupuesto = await prisma.presupuesto.create({
       data: {
@@ -143,19 +241,39 @@ export async function POST(req: NextRequest) {
       },
       include: {
         cliente: true,
-        items: true
+        items: {
+          orderBy: { orden: 'asc' }
+        },
+        user: {
+          select: { id: true, name: true }
+        }
       }
+    });
+    
+    console.log('✅ Presupuesto created successfully:', {
+      id: presupuesto.id,
+      numero: presupuesto.numero,
+      total: presupuesto.total,
+      itemsCount: presupuesto.items.length
     });
     
     return NextResponse.json(presupuesto, { status: 201 });
   } catch (error: any) {
-    console.error('Error al crear presupuesto:', error);
+    console.error('❌ Error creating presupuesto:', error);
     
-    // Manejar errores de autenticación
     if (error.message.includes('Token') || error.message.includes('autenticación')) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
+      );
+    }
+    
+    if (error.code === 'P2002' && error.meta?.target?.includes('numero')) {
+      // Error de número duplicado
+      console.error('❌ Duplicate presupuesto number');
+      return NextResponse.json(
+        { error: 'Error al generar número de presupuesto. Intente nuevamente.' },
+        { status: 409 }
       );
     }
     
