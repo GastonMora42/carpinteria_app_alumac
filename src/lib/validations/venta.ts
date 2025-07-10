@@ -1,4 +1,4 @@
-// src/lib/validations/venta.ts - ACTUALIZADO CON ITEMS
+// src/lib/validations/venta.ts - CORREGIDO
 import { z } from 'zod';
 
 export const itemVentaSchema = z.object({
@@ -30,7 +30,8 @@ export const itemVentaSchema = z.object({
     .default(0)
 });
 
-export const ventaSchema = z.object({
+// Schema base SIN refine para poder usar .partial()
+const ventaBaseSchema = z.object({
   clienteId: z.string()
     .uuid("ID de cliente inválido"),
   
@@ -78,11 +79,13 @@ export const ventaSchema = z.object({
   moneda: z.enum(['PESOS', 'DOLARES'])
     .default('PESOS'),
 
-  // NUEVO: Items para ventas directas
   items: z.array(itemVentaSchema)
     .optional()
     .default([])
-}).refine((data) => {
+});
+
+// Schema principal CON validación
+export const ventaSchema = ventaBaseSchema.refine((data) => {
   // Si no hay presupuesto, debe tener al menos un item
   if (!data.presupuestoId && (!data.items || data.items.length === 0)) {
     return false;
@@ -93,7 +96,9 @@ export const ventaSchema = z.object({
   path: ["items"]
 });
 
-export const ventaUpdateSchema = ventaSchema.partial();
+// Schema para actualización SIN refine (permite .partial())
+export const ventaUpdateSchema = ventaBaseSchema.partial();
 
 export type VentaFormData = z.infer<typeof ventaSchema>;
 export type ItemVentaFormData = z.infer<typeof itemVentaSchema>;
+export type VentaUpdateData = z.infer<typeof ventaUpdateSchema>;

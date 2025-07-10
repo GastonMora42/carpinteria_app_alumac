@@ -1,51 +1,8 @@
-// src/hooks/use-ventas.ts - ACTUALIZADO CON ITEMS
+// src/hooks/use-ventas.ts - ACTUALIZADO
 import { useState, useEffect } from 'react';
 import { VentaFormData } from '@/lib/validations/venta';
 import { api } from '@/lib/utils/http';
-
-interface ItemVenta {
-  id: string;
-  orden: number;
-  descripcion: string;
-  detalle?: string;
-  cantidad: number;
-  unidad: string;
-  precioUnitario: number;
-  descuento: number;
-  total: number;
-}
-
-interface Venta {
-  id: string;
-  numero: string;
-  cliente: {
-    id: string;
-    nombre: string;
-    email?: string;
-    telefono?: string;
-  };
-  fechaPedido: string;
-  fechaEntrega?: string;
-  fechaEntregaReal?: string;
-  estado: string;
-  prioridad: string;
-  total: number;
-  totalCobrado: number;
-  saldoPendiente: number;
-  moneda: string;
-  descripcionObra?: string;
-  porcentajeAvance: number;
-  presupuesto?: {
-    id: string;
-    numero: string;
-  };
-  items?: ItemVenta[];
-  _count?: {
-    transacciones: number;
-    materiales: number;
-    items: number;
-  };
-}
+import { convertDecimalFields, VentaWithNumbers } from '@/lib/types/prisma-overrides';
 
 interface UseVentasParams {
   page?: number;
@@ -56,7 +13,7 @@ interface UseVentasParams {
 }
 
 export function useVentas(params: UseVentasParams = {}) {
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [ventas, setVentas] = useState<VentaWithNumbers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
@@ -84,7 +41,20 @@ export function useVentas(params: UseVentasParams = {}) {
       
       console.log('✅ Ventas fetched successfully:', data.data?.length || 0);
       
-      setVentas(data.data || []);
+      // Convertir campos Decimal a number
+      const convertedVentas = (data.data || []).map((venta: any) => 
+        convertDecimalFields(venta, [
+          'subtotal', 
+          'descuento', 
+          'impuestos', 
+          'total', 
+          'totalCobrado', 
+          'saldoPendiente', 
+          'porcentajeAvance'
+        ])
+      );
+      
+      setVentas(convertedVentas);
       setPagination(data.pagination || { total: 0, pages: 0, page: 1, limit: 10 });
     } catch (err: any) {
       console.error('❌ Error fetching ventas:', err);
@@ -100,7 +70,7 @@ export function useVentas(params: UseVentasParams = {}) {
     }
   };
 
-  const createVenta = async (ventaData: VentaFormData): Promise<Venta> => {
+  const createVenta = async (ventaData: VentaFormData): Promise<VentaWithNumbers> => {
     try {
       console.log('➕ Creating venta:', ventaData.descripcionObra);
       console.log('📋 Venta data:', {
@@ -116,15 +86,26 @@ export function useVentas(params: UseVentasParams = {}) {
       
       console.log('✅ Venta created successfully:', newVenta.id);
       
-      setVentas(prev => [newVenta, ...prev]);
-      return newVenta;
+      // Convertir campos Decimal a number
+      const convertedVenta = convertDecimalFields(newVenta, [
+        'subtotal', 
+        'descuento', 
+        'impuestos', 
+        'total', 
+        'totalCobrado', 
+        'saldoPendiente', 
+        'porcentajeAvance'
+      ]);
+      
+      setVentas(prev => [convertedVenta, ...prev]);
+      return convertedVenta;
     } catch (err: any) {
       console.error('❌ Error creating venta:', err);
       throw new Error(err.message || 'Error al crear venta');
     }
   };
 
-  const updateEstado = async (id: string, nuevoEstado: string): Promise<Venta> => {
+  const updateEstado = async (id: string, nuevoEstado: string): Promise<VentaWithNumbers> => {
     try {
       console.log('🔄 Updating venta estado:', id, nuevoEstado);
       
@@ -132,15 +113,26 @@ export function useVentas(params: UseVentasParams = {}) {
       
       console.log('✅ Venta estado updated successfully:', updatedVenta.id);
       
-      setVentas(prev => prev.map(v => v.id === id ? updatedVenta : v));
-      return updatedVenta;
+      // Convertir campos Decimal a number
+      const convertedVenta = convertDecimalFields(updatedVenta, [
+        'subtotal', 
+        'descuento', 
+        'impuestos', 
+        'total', 
+        'totalCobrado', 
+        'saldoPendiente', 
+        'porcentajeAvance'
+      ]);
+      
+      setVentas(prev => prev.map(v => v.id === id ? convertedVenta : v));
+      return convertedVenta;
     } catch (err: any) {
       console.error('❌ Error updating venta estado:', err);
       throw new Error(err.message || 'Error al actualizar estado');
     }
   };
 
-  const updateAvance = async (id: string, porcentajeAvance: number): Promise<Venta> => {
+  const updateAvance = async (id: string, porcentajeAvance: number): Promise<VentaWithNumbers> => {
     try {
       console.log('📈 Updating venta avance:', id, porcentajeAvance);
       
@@ -148,8 +140,19 @@ export function useVentas(params: UseVentasParams = {}) {
       
       console.log('✅ Venta avance updated successfully:', updatedVenta.id);
       
-      setVentas(prev => prev.map(v => v.id === id ? updatedVenta : v));
-      return updatedVenta;
+      // Convertir campos Decimal a number
+      const convertedVenta = convertDecimalFields(updatedVenta, [
+        'subtotal', 
+        'descuento', 
+        'impuestos', 
+        'total', 
+        'totalCobrado', 
+        'saldoPendiente', 
+        'porcentajeAvance'
+      ]);
+      
+      setVentas(prev => prev.map(v => v.id === id ? convertedVenta : v));
+      return convertedVenta;
     } catch (err: any) {
       console.error('❌ Error updating venta avance:', err);
       throw new Error(err.message || 'Error al actualizar avance');
@@ -175,7 +178,7 @@ export function useVentas(params: UseVentasParams = {}) {
 
 // Hook para obtener una venta específica con todos sus detalles
 export function useVenta(id: string | null) {
-  const [venta, setVenta] = useState<Venta | null>(null);
+  const [venta, setVenta] = useState<VentaWithNumbers | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,7 +197,18 @@ export function useVenta(id: string | null) {
         console.log('✅ Venta fetched successfully:', data.id);
         console.log('📋 Items count:', data.items?.length || 0);
         
-        setVenta(data);
+        // Convertir campos Decimal a number
+        const convertedVenta = convertDecimalFields(data, [
+          'subtotal', 
+          'descuento', 
+          'impuestos', 
+          'total', 
+          'totalCobrado', 
+          'saldoPendiente', 
+          'porcentajeAvance'
+        ]);
+        
+        setVenta(convertedVenta);
       } catch (err: any) {
         console.error('❌ Error fetching venta:', err);
         setError(err.message || 'Error al cargar venta');
