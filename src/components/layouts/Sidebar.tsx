@@ -93,7 +93,6 @@ const navigation = [
       { name: 'Exportar Datos', href: '/reportes/exportar' }
     ]
   },
-  { name: 'Configuración', href: '/configuracion', icon: HiOutlineCog }
 ];
 
 export default function Sidebar() {
