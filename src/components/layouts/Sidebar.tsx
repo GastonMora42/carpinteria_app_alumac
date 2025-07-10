@@ -37,6 +37,8 @@ const navigation = [
     submenu: [
       { name: 'Todos', href: '/presupuestos' },
       { name: 'Nuevo Presupuesto', href: '/presupuestos/nuevo' },
+      { name: 'Pendientes', href: '/presupuestos/pendientes' },
+      { name: 'Vencidos', href: '/presupuestos/vencidos' }
     ]
   },
   { 
@@ -45,6 +47,7 @@ const navigation = [
     icon: HiOutlineUsers,
     submenu: [
       { name: 'Todos los Clientes', href: '/clientes' },
+      { name: 'Nuevo Cliente', href: '/clientes/nuevo' }
     ]
   },
   { 
@@ -69,6 +72,28 @@ const navigation = [
       { name: 'Nuevo Material', href: '/materiales/nuevo' }
     ]
   },
+  { 
+    name: 'Inventario', 
+    href: '/inventario', 
+    icon: HiOutlineDatabase,
+    submenu: [
+      { name: 'Stock Actual', href: '/inventario' },
+      { name: 'Movimientos', href: '/inventario/movimientos' },
+      { name: 'Stock Mínimo', href: '/inventario/alertas' }
+    ]
+  },
+  { 
+    name: 'Reportes', 
+    href: '/reportes', 
+    icon: HiOutlineChartBar,
+    submenu: [
+      { name: 'Dashboard Ejecutivo', href: '/reportes' },
+      { name: 'Rendimiento por Obra', href: '/reportes/rendimiento' },
+      { name: 'Análisis Financiero', href: '/reportes/financiero' },
+      { name: 'Exportar Datos', href: '/reportes/exportar' }
+    ]
+  },
+  { name: 'Configuración', href: '/configuracion', icon: HiOutlineCog }
 ];
 
 export default function Sidebar() {
@@ -98,7 +123,7 @@ export default function Sidebar() {
                 />
               </div>
               <div>
-                <h1 className="text-white text-xl font-bold">AZIFE</h1>
+                <h1 className="text-white text-xl font-bold">Alumac</h1>
                 <p className="text-blue-200 text-xs">Sistema de Gestión</p>
               </div>
             </Link>
@@ -168,8 +193,8 @@ export default function Sidebar() {
           <div className="flex-shrink-0 px-4 py-4 border-t border-blue-700">
             <div className="bg-blue-800 rounded-lg p-3 text-center">
               <div className="text-xs text-blue-200 mb-2">
-                <p className="font-semibold">AZIFE v1.0</p>
-                <p>© 2025 AZIFE</p>
+                <p className="font-semibold">AlumGestión v1.0</p>
+                <p>© 2025 Alumac</p>
               </div>
               <div className="flex items-center justify-center space-x-1">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
