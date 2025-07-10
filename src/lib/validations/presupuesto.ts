@@ -1,7 +1,15 @@
-// ===================================
-
-// src/lib/validations/presupuesto.ts
+// src/lib/validations/presupuesto.ts - CORREGIDO PARA MANEJAR FECHAS
 import { z } from 'zod';
+
+// Helper para transformar strings de fecha a Date objects
+const dateTransform = z.string().or(z.date()).transform((value) => {
+  if (value instanceof Date) return value;
+  const date = new Date(value);
+  if (isNaN(date.getTime())) {
+    throw new Error('Fecha inválida');
+  }
+  return date;
+});
 
 export const itemPresupuestoSchema = z.object({
   descripcion: z.string()
@@ -36,8 +44,10 @@ export const presupuestoSchema = z.object({
   clienteId: z.string()
     .uuid("ID de cliente inválido"),
   
-  fechaValidez: z.date()
-    .min(new Date(), "La fecha de validez debe ser futura"),
+  // CORREGIDO: Usar dateTransform para manejar tanto strings como dates
+  fechaValidez: dateTransform.refine((date) => {
+    return date > new Date();
+  }, "La fecha de validez debe ser futura"),
   
   descripcionObra: z.string()
     .min(1, "La descripción de la obra es requerida")
@@ -86,4 +96,3 @@ export const presupuestoUpdateSchema = presupuestoSchema.partial();
 
 export type PresupuestoFormData = z.infer<typeof presupuestoSchema>;
 export type ItemPresupuestoFormData = z.infer<typeof itemPresupuestoSchema>;
-
