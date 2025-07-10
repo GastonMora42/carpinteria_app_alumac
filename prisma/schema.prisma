@@ -228,6 +228,7 @@ model Pedido {
   clienteId         String
   presupuestoId     String?         @unique // Opcional, puede venir de presupuesto
   
+  
   // Fechas
   fechaPedido       DateTime        @default(now())
   fechaEntrega      DateTime?
