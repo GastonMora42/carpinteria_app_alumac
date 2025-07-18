@@ -1,4 +1,4 @@
-// src/lib/utils/calculations.ts
+// src/lib/utils/calculations.ts - ACTUALIZADO CON FUNCIÓN DE FECHA DE ENTREGA
 export class CalculationUtils {
     /**
      * Calcula el total de items aplicando descuentos
@@ -80,6 +80,81 @@ export class CalculationUtils {
     static calculateROI(inversion: number, ganancia: number): number {
       if (inversion === 0) return 0;
       return Number(((ganancia / inversion) * 100).toFixed(2));
+    }
+
+    /**
+     * NUEVA: Calcula fecha de entrega basada en una cadena de tiempo
+     */
+    static calcularFechaEntregaFromString(fechaInicio: Date, tiempoEntrega: string): Date {
+      try {
+        // Normalizar el string de tiempo de entrega
+        const tiempo = tiempoEntrega.toLowerCase().trim();
+        
+        // Patrones comunes para extraer días
+        let dias = 0;
+
+        // Buscar números seguidos de "día", "días", "d"
+        const diasMatch = tiempo.match(/(\d+)\s*(día|días|d\b)/);
+        if (diasMatch) {
+          dias += parseInt(diasMatch[1]);
+        }
+
+        // Buscar números seguidos de "semana", "semanas", "s"
+        const semanasMatch = tiempo.match(/(\d+)\s*(semana|semanas|s\b)/);
+        if (semanasMatch) {
+          dias += parseInt(semanasMatch[1]) * 7;
+        }
+
+        // Buscar números seguidos de "mes", "meses", "m"
+        const mesesMatch = tiempo.match(/(\d+)\s*(mes|meses|m\b)/);
+        if (mesesMatch) {
+          dias += parseInt(mesesMatch[1]) * 30; // Aproximado
+        }
+
+        // Si no encontró ningún patrón, intentar extraer solo números
+        if (dias === 0) {
+          const numeroMatch = tiempo.match(/(\d+)/);
+          if (numeroMatch) {
+            dias = parseInt(numeroMatch[1]);
+            // Si es un número solo, asumir que son días
+          } else {
+            // Si no se puede parsear, asumir 7 días por defecto
+            dias = 7;
+          }
+        }
+
+        // Calcular fecha de entrega
+        const fechaEntrega = new Date(fechaInicio);
+        fechaEntrega.setDate(fechaEntrega.getDate() + dias);
+        
+        return fechaEntrega;
+      } catch (error) {
+        console.error('Error calculando fecha de entrega:', error);
+        // En caso de error, retornar fecha + 7 días
+        const fechaDefault = new Date(fechaInicio);
+        fechaDefault.setDate(fechaDefault.getDate() + 7);
+        return fechaDefault;
+      }
+    }
+
+    /**
+     * NUEVA: Formatea tiempo de entrega para mostrar
+     */
+    static formatTiempoEntrega(tiempoEntrega: string): string {
+      const tiempo = tiempoEntrega.toLowerCase().trim();
+      
+      // Si ya está en formato legible, devolverlo
+      if (tiempo.includes('día') || tiempo.includes('semana') || tiempo.includes('mes')) {
+        return tiempoEntrega;
+      }
+
+      // Si es solo un número, asumir días
+      const numero = parseInt(tiempo);
+      if (!isNaN(numero)) {
+        return `${numero} día${numero !== 1 ? 's' : ''}`;
+      }
+
+      return tiempoEntrega;
     }
   }
   
@@ -270,4 +345,3 @@ export class CalculationUtils {
       return `${start} - ${end}`;
     }
   }
-  

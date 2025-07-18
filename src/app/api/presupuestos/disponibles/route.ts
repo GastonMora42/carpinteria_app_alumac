@@ -1,4 +1,4 @@
-// src/app/api/presupuestos/disponibles/route.ts
+// src/app/api/presupuestos/disponibles/route.ts - CORREGIDO PARA SER MÁS PERMISIVO
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { verifyCognitoAuth } from '@/lib/auth/cognito-verify';
@@ -10,14 +10,51 @@ export async function GET(req: NextRequest) {
     
     console.log('📋 Fetching presupuestos disponibles para venta...');
     
-    // Obtener presupuestos que pueden convertirse a venta
+    // PASO 1: Obtener todos los presupuestos para debugging
+    const todosLosPresupuestos = await prisma.presupuesto.findMany({
+      select: {
+        id: true,
+        numero: true,
+        estado: true,
+        fechaValidez: true,
+        total: true,
+        cliente: { select: { nombre: true } },
+        pedido: { select: { id: true, numero: true } }
+      },
+      orderBy: { fechaEmision: 'desc' },
+      take: 10
+    });
+
+    console.log('📊 Debug - Todos los presupuestos:', todosLosPresupuestos.map(p => ({
+      numero: p.numero,
+      estado: p.estado,
+      vencimiento: p.fechaValidez,
+      yaConvertido: !!p.pedido,
+      cliente: p.cliente.nombre
+    })));
+
+    // PASO 2: Buscar presupuestos que PUEDEN convertirse (más permisivo)
     const presupuestosDisponibles = await prisma.presupuesto.findMany({
       where: {
-        estado: 'APROBADO',
-        pedido: null, // No debe tener pedido asociado (no convertido)
-        fechaValidez: {
-          gte: new Date() // No vencido
-        }
+        // Estados que permiten conversión (no solo APROBADO)
+        estado: {
+          in: ['PENDIENTE', 'ENVIADO', 'APROBADO']
+        },
+        // No debe tener pedido asociado (no convertido)
+        pedido: null,
+        // Incluir algunos vencidos recientes (últimos 7 días)
+        OR: [
+          {
+            fechaValidez: {
+              gte: new Date() // No vencidos
+            }
+          },
+          {
+            fechaValidez: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Vencidos hace menos de 7 días
+            }
+          }
+        ]
       },
       include: {
         cliente: {
@@ -44,29 +81,64 @@ export async function GET(req: NextRequest) {
 
     console.log(`✅ Found ${presupuestosDisponibles.length} presupuestos disponibles`);
 
-    // Enriquecer con información adicional
+    // PASO 3: Enriquecer con información adicional
     const presupuestosEnriquecidos = presupuestosDisponibles.map(presupuesto => {
       const fechaVencimiento = new Date(presupuesto.fechaValidez);
       const hoy = new Date();
       const diasRestantes = Math.ceil((fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
       
+      // Determinar si está vencido pero aún convertible
+      const vencido = diasRestantes <= 0;
+      const urgente = !vencido && diasRestantes <= 7;
+      const puedeConvertirse = diasRestantes >= -7; // Permite vencidos de hasta 7 días
+      
       return {
         ...presupuesto,
         diasRestantes,
-        urgente: diasRestantes <= 7, // Marcar como urgente si vence en 7 días o menos
-        valorTotal: Number(presupuesto.total)
+        vencido,
+        urgente,
+        puedeConvertirse,
+        valorTotal: Number(presupuesto.total),
+        // Indicador visual para la UI
+        statusIndicator: vencido ? 'vencido' : urgente ? 'urgente' : 'normal'
       };
     });
 
+    // PASO 4: Filtrar solo los que pueden convertirse
+    const disponiblesParaConversion = presupuestosEnriquecidos.filter(p => p.puedeConvertirse);
+
+    console.log('📋 Presupuestos disponibles por estado:', {
+      pendientes: disponiblesParaConversion.filter(p => p.estado === 'PENDIENTE').length,
+      enviados: disponiblesParaConversion.filter(p => p.estado === 'ENVIADO').length,
+      aprobados: disponiblesParaConversion.filter(p => p.estado === 'APROBADO').length,
+      vencidos: disponiblesParaConversion.filter(p => p.vencido).length,
+      urgentes: disponiblesParaConversion.filter(p => p.urgente).length
+    });
+
     return NextResponse.json({
-      data: presupuestosEnriquecidos,
+      data: disponiblesParaConversion,
       estadisticas: {
-        total: presupuestosEnriquecidos.length,
-        montoTotal: presupuestosEnriquecidos.reduce((acc, p) => acc + p.valorTotal, 0),
-        urgentes: presupuestosEnriquecidos.filter(p => p.urgente).length,
-        promedioDiasVencimiento: presupuestosEnriquecidos.length > 0 
-          ? Math.round(presupuestosEnriquecidos.reduce((acc, p) => acc + p.diasRestantes, 0) / presupuestosEnriquecidos.length)
-          : 0
+        total: disponiblesParaConversion.length,
+        montoTotal: disponiblesParaConversion.reduce((acc, p) => acc + p.valorTotal, 0),
+        urgentes: disponiblesParaConversion.filter(p => p.urgente).length,
+        vencidos: disponiblesParaConversion.filter(p => p.vencido).length,
+        promedioDiasVencimiento: disponiblesParaConversion.length > 0 
+          ? Math.round(disponiblesParaConversion.reduce((acc, p) => acc + Math.max(0, p.diasRestantes), 0) / disponiblesParaConversion.length)
+          : 0,
+        // Estadísticas adicionales
+        porEstado: {
+          pendientes: disponiblesParaConversion.filter(p => p.estado === 'PENDIENTE').length,
+          enviados: disponiblesParaConversion.filter(p => p.estado === 'ENVIADO').length,
+          aprobados: disponiblesParaConversion.filter(p => p.estado === 'APROBADO').length
+        }
+      },
+      debug: {
+        totalPresupuestosEnSistema: todosLosPresupuestos.length,
+        criteriosBusqueda: {
+          estados: ['PENDIENTE', 'ENVIADO', 'APROBADO'],
+          sinPedidoAsociado: true,
+          ventanaVencimiento: '7 días hacia atrás desde hoy'
+        }
       }
     });
   } catch (error: any) {
@@ -116,9 +188,10 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    if (presupuesto.estado !== 'APROBADO') {
+    // Verificar estado (más permisivo)
+    if (!['PENDIENTE', 'ENVIADO', 'APROBADO'].includes(presupuesto.estado)) {
       return NextResponse.json(
-        { error: 'Solo se pueden convertir presupuestos aprobados' },
+        { error: `No se puede convertir presupuesto en estado: ${presupuesto.estado}` },
         { status: 400 }
       );
     }
@@ -130,10 +203,11 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Verificar vencimiento
-    if (new Date(presupuesto.fechaValidez) < new Date()) {
+    // Verificar vencimiento (más permisivo - permite vencidos recientes)
+    const diasVencimiento = Math.ceil((new Date(presupuesto.fechaValidez).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    if (diasVencimiento < -7) {
       return NextResponse.json(
-        { error: 'Este presupuesto está vencido' },
+        { error: 'Este presupuesto está vencido hace más de 7 días' },
         { status: 400 }
       );
     }
@@ -145,7 +219,9 @@ export async function POST(req: NextRequest) {
         numero: presupuesto.numero,
         cliente: presupuesto.clienteId,
         total: presupuesto.total,
-        moneda: presupuesto.moneda
+        moneda: presupuesto.moneda,
+        vencimiento: presupuesto.fechaValidez,
+        diasVencimiento
       }
     });
   } catch (error: any) {

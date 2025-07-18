@@ -1,4 +1,4 @@
-// src/app/(auth)/ventas/nueva/page.tsx - VERSIÓN MEJORADA CON VINCULACIÓN DE PRESUPUESTOS
+// src/app/(auth)/ventas/nueva/page.tsx - MEJORADO PARA MANTENER TODOS LOS CAMPOS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,7 +23,8 @@ import {
   HiOutlineCheckCircle,
   HiOutlineClipboard,
   HiOutlineClock,
-  HiOutlineEye
+  HiOutlineEye,
+  HiOutlineExclamation
 } from 'react-icons/hi';
 
 // Hook personalizado para presupuestos disponibles
@@ -32,6 +33,7 @@ function usePresupuestosDisponibles() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [estadisticas, setEstadisticas] = useState<any>(null);
+  const [debug, setDebug] = useState<any>(null);
 
   const fetchPresupuestos = async () => {
     try {
@@ -42,13 +44,22 @@ function usePresupuestosDisponibles() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('📋 Presupuestos disponibles response:', data);
+        
         setPresupuestos(data.data || []);
         setEstadisticas(data.estadisticas || null);
+        setDebug(data.debug || null);
+        
+        // Log para debugging
+        if (data.debug) {
+          console.log('🔍 Debug info:', data.debug);
+        }
       } else {
         throw new Error('Error al cargar presupuestos');
       }
     } catch (err: any) {
       setError(err.message);
+      console.error('❌ Error fetching presupuestos:', err);
     } finally {
       setLoading(false);
     }
@@ -58,7 +69,7 @@ function usePresupuestosDisponibles() {
     fetchPresupuestos();
   }, []);
 
-  return { presupuestos, loading, error, estadisticas, refetch: fetchPresupuestos };
+  return { presupuestos, loading, error, estadisticas, debug, refetch: fetchPresupuestos };
 }
 
 // Componente para seleccionar presupuesto
@@ -67,13 +78,15 @@ function PresupuestoSelector({
   onSelect, 
   onClear, 
   presupuestos, 
-  loading 
+  loading,
+  debug 
 }: {
   selectedId: string;
   onSelect: (presupuesto: any) => void;
   onClear: () => void;
   presupuestos: any[];
   loading: boolean;
+  debug?: any;
 }) {
   const [showModal, setShowModal] = useState(false);
   const selectedPresupuesto = presupuestos.find(p => p.id === selectedId);
@@ -84,17 +97,24 @@ function PresupuestoSelector({
         <label className="block text-sm font-medium text-gray-700">
           Presupuesto Origen (Opcional)
         </label>
-        {presupuestos.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowModal(true)}
-          >
-            <HiOutlineEye className="h-4 w-4 mr-2" />
-            Ver Disponibles ({presupuestos.length})
-          </Button>
-        )}
+        <div className="flex items-center space-x-2">
+          {presupuestos.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowModal(true)}
+            >
+              <HiOutlineEye className="h-4 w-4 mr-2" />
+              Ver Disponibles ({presupuestos.length})
+            </Button>
+          )}
+          {debug && (
+            <div className="text-xs text-gray-500">
+              Total en sistema: {debug.totalPresupuestosEnSistema}
+            </div>
+          )}
+        </div>
       </div>
 
       {selectedPresupuesto ? (
@@ -104,6 +124,18 @@ function PresupuestoSelector({
               <h4 className="font-medium text-blue-900 mb-2 flex items-center">
                 <HiOutlineDocumentText className="h-5 w-5 mr-2" />
                 {selectedPresupuesto.numero}
+                {selectedPresupuesto.vencido && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                    <HiOutlineExclamation className="h-3 w-3 mr-1" />
+                    Vencido
+                  </span>
+                )}
+                {selectedPresupuesto.urgente && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <HiOutlineClock className="h-3 w-3 mr-1" />
+                    Urgente
+                  </span>
+                )}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
@@ -117,18 +149,25 @@ function PresupuestoSelector({
                   </p>
                 </div>
                 <div>
-                  <span className="font-medium text-blue-700">Vence en:</span>
-                  <p className={`font-medium ${selectedPresupuesto.urgente ? 'text-red-600' : 'text-blue-900'}`}>
-                    {selectedPresupuesto.diasRestantes} días
-                    {selectedPresupuesto.urgente && (
-                      <span className="ml-1 text-xs">(¡Urgente!)</span>
-                    )}
-                  </p>
+                  <span className="font-medium text-blue-700">Estado:</span>
+                  <p className="text-blue-900">{selectedPresupuesto.estado}</p>
                 </div>
               </div>
-              <div className="mt-3">
-                <span className="font-medium text-blue-700">Descripción:</span>
-                <p className="text-blue-900 text-sm">{selectedPresupuesto.descripcionObra}</p>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-blue-700">Descripción:</span>
+                  <p className="text-blue-900 text-sm">{selectedPresupuesto.descripcionObra}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-700">Vencimiento:</span>
+                  <p className={`font-medium ${selectedPresupuesto.vencido ? 'text-red-600' : selectedPresupuesto.urgente ? 'text-yellow-600' : 'text-blue-900'}`}>
+                    {DateUtils.formatDate(selectedPresupuesto.fechaValidez)}
+                    {selectedPresupuesto.diasRestantes > 0 ? 
+                      ` (${selectedPresupuesto.diasRestantes} días)` : 
+                      ` (vencido hace ${Math.abs(selectedPresupuesto.diasRestantes)} días)`
+                    }
+                  </p>
+                </div>
               </div>
             </div>
             <Button
@@ -143,26 +182,50 @@ function PresupuestoSelector({
           </div>
         </div>
       ) : (
-        <Select
-          value=""
-          onChange={(e) => {
-            if (e.target.value) {
-              const presupuesto = presupuestos.find(p => p.id === e.target.value);
-              if (presupuesto) onSelect(presupuesto);
-            }
-          }}
-          disabled={loading}
-        >
-          <option value="">
-            {loading ? 'Cargando presupuestos...' : 'Venta directa (sin presupuesto)'}
-          </option>
-          {presupuestos.map(presupuesto => (
-            <option key={presupuesto.id} value={presupuesto.id}>
-              {presupuesto.numero} - {presupuesto.cliente.nombre} - {CurrencyUtils.formatAmount(presupuesto.total, presupuesto.moneda)}
-              {presupuesto.urgente && ' ⚠️'}
+        <div>
+          <Select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                const presupuesto = presupuestos.find(p => p.id === e.target.value);
+                if (presupuesto) onSelect(presupuesto);
+              }
+            }}
+            disabled={loading}
+          >
+            <option value="">
+              {loading ? 'Cargando presupuestos...' : 'Venta directa (sin presupuesto)'}
             </option>
-          ))}
-        </Select>
+            {presupuestos.map(presupuesto => (
+              <option key={presupuesto.id} value={presupuesto.id}>
+                {presupuesto.numero} - {presupuesto.cliente.nombre} - {CurrencyUtils.formatAmount(presupuesto.total, presupuesto.moneda)}
+                {presupuesto.vencido && ' ⚠️ VENCIDO'}
+                {presupuesto.urgente && ' ⏰ URGENTE'}
+              </option>
+            ))}
+          </Select>
+          
+          {/* Mensaje informativo si no hay presupuestos */}
+          {!loading && presupuestos.length === 0 && (
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center">
+                <HiOutlineExclamationCircle className="h-5 w-5 text-yellow-600 mr-2" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800">No hay presupuestos disponibles</p>
+                  <p className="text-xs text-yellow-700">
+                    {debug ? (
+                      <>Total de presupuestos en sistema: {debug.totalPresupuestosEnSistema}. 
+                      Criterios: Estados permitidos ({debug.criteriosBusqueda.estados.join(', ')}), 
+                      sin pedido asociado, no vencidos hace más de 7 días.</>
+                    ) : (
+                      'Los presupuestos deben estar en estado PENDIENTE, ENVIADO o APROBADO y no estar ya convertidos.'
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Modal de presupuestos disponibles */}
@@ -188,7 +251,9 @@ function PresupuestoSelector({
                     <div
                       key={presupuesto.id}
                       className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                        presupuesto.urgente ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                        presupuesto.vencido ? 'border-red-200 bg-red-50' : 
+                        presupuesto.urgente ? 'border-yellow-200 bg-yellow-50' : 
+                        'border-gray-200'
                       }`}
                       onClick={() => {
                         onSelect(presupuesto);
@@ -199,22 +264,33 @@ function PresupuestoSelector({
                         <div>
                           <div className="flex items-center">
                             <h4 className="font-medium text-gray-900">{presupuesto.numero}</h4>
-                            {presupuesto.urgente && (
+                            <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              presupuesto.estado === 'APROBADO' ? 'bg-green-100 text-green-800' :
+                              presupuesto.estado === 'ENVIADO' ? 'bg-blue-100 text-blue-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {presupuesto.estado}
+                            </span>
+                            {presupuesto.vencido && (
                               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                <HiOutlineClock className="h-3 w-3 mr-1" />
+                                Vencido
+                              </span>
+                            )}
+                            {presupuesto.urgente && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                 Urgente
                               </span>
                             )}
                           </div>
                           <p className="text-sm text-gray-600">{presupuesto.cliente.nombre}</p>
-                          <p className="text-xs text-gray-500 mt-1">{presupuesto.descripcionObra}</p>
+                          <p className="text-xs text-gray-500 mt-1 max-w-md truncate">{presupuesto.descripcionObra}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-gray-900">
                             {CurrencyUtils.formatAmount(presupuesto.total, presupuesto.moneda)}
                           </p>
                           <p className="text-xs text-gray-500">
-                            Vence en {presupuesto.diasRestantes} días
+                            Vence: {DateUtils.formatDate(presupuesto.fechaValidez)}
                           </p>
                           <p className="text-xs text-gray-500">
                             {presupuesto._count.items} items
@@ -237,7 +313,7 @@ export default function NuevaVentaPage() {
   const router = useRouter();
   const { clients } = useClients();
   const { createVenta } = useVentas();
-  const { presupuestos, loading: presupuestosLoading, estadisticas } = usePresupuestosDisponibles();
+  const { presupuestos, loading: presupuestosLoading, estadisticas, debug } = usePresupuestosDisponibles();
 
   const [formData, setFormData] = useState<VentaFormData>({
     clienteId: '',
@@ -280,22 +356,33 @@ export default function NuevaVentaPage() {
         formData.impuestos
       );
 
-  // Manejar selección de presupuesto
+  // FUNCIÓN MEJORADA: Manejar selección de presupuesto manteniendo TODOS los campos
   const handlePresupuestoSelect = (presupuesto: any) => {
+    console.log('📋 Seleccionando presupuesto completo:', presupuesto);
+    
     setSelectedPresupuesto(presupuesto);
     setVentaDirecta(false);
+    
+    // Copiar TODOS los campos relevantes del presupuesto
     setFormData(prev => ({
       ...prev,
       presupuestoId: presupuesto.id,
       clienteId: presupuesto.cliente.id,
       descripcionObra: presupuesto.descripcionObra || '',
+      observaciones: presupuesto.observaciones || '',
+      condicionesPago: presupuesto.condicionesPago || '',
+      tiempoEntrega: presupuesto.tiempoEntrega || '', // Si existe en el presupuesto
       moneda: presupuesto.moneda as 'PESOS' | 'DOLARES',
       descuento: Number(presupuesto.descuento) || 0,
       impuestos: Number(presupuesto.impuestos) || 0,
-      condicionesPago: presupuesto.condicionesPago || '',
-      observaciones: `Generado desde presupuesto ${presupuesto.numero}`,
+      // Mantener fecha de entrega o calcular basada en tiempo de entrega
+      fechaEntrega: presupuesto.tiempoEntrega ? 
+        CalculationUtils.calcularFechaEntregaFromString(new Date(), presupuesto.tiempoEntrega) : 
+        prev.fechaEntrega,
       items: [] // Limpiar items ya que vienen del presupuesto
     }));
+
+    console.log('✅ Presupuesto aplicado a la venta con todos los campos');
   };
 
   // Limpiar selección de presupuesto
@@ -307,11 +394,13 @@ export default function NuevaVentaPage() {
       presupuestoId: '',
       clienteId: '',
       descripcionObra: '',
+      observaciones: '',
+      condicionesPago: '',
+      lugarEntrega: '',
       moneda: 'PESOS',
       descuento: 0,
       impuestos: 21,
-      condicionesPago: '',
-      observaciones: '',
+      fechaEntrega: new Date(),
       items: [{
         descripcion: '',
         detalle: '',
@@ -448,8 +537,8 @@ export default function NuevaVentaPage() {
           <Card>
             <CardContent className="p-4">
               <div>
-                <p className="text-xs font-medium text-gray-500">Promedio Días</p>
-                <p className="text-sm font-bold text-gray-900">{estadisticas.promedioDiasVencimiento}</p>
+                <p className="text-xs font-medium text-gray-500">Aprobados</p>
+                <p className="text-sm font-bold text-green-600">{estadisticas.porEstado?.aprobados || 0}</p>
               </div>
             </CardContent>
           </Card>
@@ -484,6 +573,7 @@ export default function NuevaVentaPage() {
               onClear={handlePresupuestoClear}
               presupuestos={presupuestos}
               loading={presupuestosLoading}
+              debug={debug}
             />
 
             <Select
@@ -500,6 +590,75 @@ export default function NuevaVentaPage() {
                 </option>
               ))}
             </Select>
+          </CardContent>
+        </Card>
+
+        {/* Detalles del pedido - SIEMPRE VISIBLE Y EDITABLE */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <HiOutlineCalendar className="h-5 w-5 mr-2" />
+              Detalles del Pedido
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Fecha de Entrega"
+                type="date"
+                value={formData.fechaEntrega?.toISOString().split('T')[0] || ''}
+                onChange={(e) => handleChange('fechaEntrega', new Date(e.target.value))}
+                min={new Date().toISOString().split('T')[0]}
+              />
+
+              <Select
+                label="Prioridad"
+                value={formData.prioridad}
+                onChange={(e) => handleChange('prioridad', e.target.value)}
+              >
+                <option value="BAJA">Baja</option>
+                <option value="NORMAL">Normal</option>
+                <option value="ALTA">Alta</option>
+                <option value="URGENTE">Urgente</option>
+              </Select>
+            </div>
+
+            <Input
+              label="Descripción de la Obra *"
+              value={formData.descripcionObra}
+              onChange={(e) => handleChange('descripcionObra', e.target.value)}
+              error={errors.descripcionObra}
+              placeholder="Describe el trabajo a realizar..."
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Condiciones de Pago"
+                value={formData.condicionesPago}
+                onChange={(e) => handleChange('condicionesPago', e.target.value)}
+                placeholder="ej: 50% anticipo, 50% contra entrega"
+              />
+
+              <Input
+                label="Lugar de Entrega"
+                value={formData.lugarEntrega}
+                onChange={(e) => handleChange('lugarEntrega', e.target.value)}
+                placeholder="Dirección de entrega"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observaciones
+              </label>
+              <textarea
+                value={formData.observaciones}
+                onChange={(e) => handleChange('observaciones', e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Información adicional del pedido..."
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -604,49 +763,81 @@ export default function NuevaVentaPage() {
           </Card>
         )}
 
-        {/* Resto del formulario: Detalles del pedido, fechas, totales, etc. */}
-        {/* ... (resto del código similar al original) ... */}
-
-        {/* Totales */}
+        {/* Totales y configuración final */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <HiOutlineCalculator className="h-5 w-5 mr-2" />
-              Resumen de Totales
+              Totales y Configuración
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h4 className="font-medium text-gray-900 mb-4">
-                Totales de la Venta
-                {selectedPresupuesto && (
-                  <span className="text-sm text-blue-600 ml-2">
-                    (desde presupuesto {selectedPresupuesto.numero})
-                  </span>
-                )}
-              </h4>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{CurrencyUtils.formatAmount(totales.subtotal, formData.moneda)}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {ventaDirecta && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Descuento General (%)"
+                      type="number"
+                      value={formData.descuento}
+                      onChange={(e) => handleChange('descuento', Number(e.target.value))}
+                      min="0"
+                      max="100"
+                    />
+
+                    <Input
+                      label="Impuestos (%)"
+                      type="number"
+                      value={formData.impuestos}
+                      onChange={(e) => handleChange('impuestos', Number(e.target.value))}
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+
+                  <Select
+                    label="Moneda"
+                    value={formData.moneda}
+                    onChange={(e) => handleChange('moneda', e.target.value)}
+                  >
+                    <option value="PESOS">Pesos Argentinos</option>
+                    <option value="DOLARES">Dólares</option>
+                  </Select>
                 </div>
-                {totales.descuentoTotal > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Descuento:</span>
-                    <span>-{CurrencyUtils.formatAmount(totales.descuentoTotal, formData.moneda)}</span>
-                  </div>
-                )}
-                {totales.impuestos > 0 && (
+              )}
+
+              <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <h4 className="font-medium text-gray-900 mb-4">
+                  Resumen de Totales
+                  {selectedPresupuesto && (
+                    <span className="text-sm text-blue-600 ml-2">
+                      (desde presupuesto {selectedPresupuesto.numero})
+                    </span>
+                  )}
+                </h4>
+                <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span>Impuestos:</span>
-                    <span>{CurrencyUtils.formatAmount(totales.impuestos, formData.moneda)}</span>
+                    <span>Subtotal:</span>
+                    <span>{CurrencyUtils.formatAmount(totales.subtotal, formData.moneda)}</span>
                   </div>
-                )}
-                <div className="border-t pt-3 flex justify-between font-bold text-lg">
-                  <span>Total:</span>
-                  <span className="text-blue-600">
-                    {CurrencyUtils.formatAmount(totales.total, formData.moneda)}
-                  </span>
+                  {totales.descuentoTotal > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Descuento:</span>
+                      <span>-{CurrencyUtils.formatAmount(totales.descuentoTotal, formData.moneda)}</span>
+                    </div>
+                  )}
+                  {totales.impuestos > 0 && (
+                    <div className="flex justify-between">
+                      <span>Impuestos:</span>
+                      <span>{CurrencyUtils.formatAmount(totales.impuestos, formData.moneda)}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-3 flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span className="text-blue-600">
+                      {CurrencyUtils.formatAmount(totales.total, formData.moneda)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
