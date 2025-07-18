@@ -1,8 +1,9 @@
-// src/hooks/use-pagos-venta.ts - HOOK ESPECÍFICO PARA PAGOS DE VENTAS
+// src/hooks/use-pagos-ventas.ts - VERSIÓN CORREGIDA Y OPTIMIZADA
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/utils/http';
+import { TransaccionFormData } from '@/lib/validations/transaccion';
 
-interface PagoVenta {
+export interface PagoVenta {
   id: string;
   numero: string;
   fecha: string;
@@ -23,23 +24,27 @@ interface PagoVenta {
   createdAt: string;
 }
 
-interface PagoFormData {
-  monto: number;
-  concepto: string;
-  descripcion?: string;
-  fecha: Date;
-  medioPagoId: string;
-  numeroComprobante?: string;
-  tipoComprobante?: string;
-}
-
-interface EstadisticasPagos {
+export interface EstadisticasPagos {
   totalPagos: number;
   montoCobrado: number;
   saldoPendiente: number;
   porcentajeCobrado: number;
   ultimoPago?: PagoVenta;
   pagoPromedio: number;
+  proximoVencimiento?: Date;
+}
+
+export interface VentaInfo {
+  id: string;
+  numero: string;
+  total: number;
+  totalCobrado: number;
+  saldoPendiente: number;
+  moneda: string;
+  cliente: {
+    id: string;
+    nombre: string;
+  };
 }
 
 export function usePagosVenta(ventaId: string | null) {
@@ -55,7 +60,10 @@ export function usePagosVenta(ventaId: string | null) {
   });
 
   const fetchPagos = async () => {
-    if (!ventaId) return;
+    if (!ventaId) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -63,8 +71,13 @@ export function usePagosVenta(ventaId: string | null) {
       
       console.log('💰 Fetching pagos for venta:', ventaId);
       
-      // Obtener pagos de esta venta específica
-      const data = await api.get(`/api/transacciones?pedidoId=${ventaId}&tipo=PAGO_OBRA`);
+      // Obtener transacciones de tipo pago para esta venta
+      const params = new URLSearchParams({
+        pedidoId: ventaId,
+        tipo: 'PAGO_OBRA'
+      });
+      
+      const data = await api.get(`/api/transacciones?${params}`);
       
       console.log('✅ Pagos fetched successfully:', data.data?.length || 0);
       
@@ -74,17 +87,16 @@ export function usePagosVenta(ventaId: string | null) {
       // Calcular estadísticas
       const totalPagos = pagosData.length;
       const montoCobrado = pagosData.reduce((acc: number, pago: PagoVenta) => acc + Number(pago.monto), 0);
-      const ultimoPago = pagosData.length > 0 ? pagosData[0] : undefined; // Asumiendo que vienen ordenados por fecha desc
+      const ultimoPago = pagosData.length > 0 ? pagosData[0] : undefined;
       const pagoPromedio = totalPagos > 0 ? montoCobrado / totalPagos : 0;
 
-      setEstadisticas({
+      setEstadisticas(prev => ({
+        ...prev,
         totalPagos,
         montoCobrado,
-        saldoPendiente: 0, // Se calculará con datos de la venta
-        porcentajeCobrado: 0, // Se calculará con datos de la venta
         ultimoPago,
         pagoPromedio
-      });
+      }));
       
     } catch (err: any) {
       console.error('❌ Error fetching pagos:', err);
@@ -100,25 +112,11 @@ export function usePagosVenta(ventaId: string | null) {
     }
   };
 
-  const registrarPago = async (pagoData: PagoFormData, ventaData: { id: string; cliente: { id: string }; moneda: string }): Promise<PagoVenta> => {
+  const registrarPago = async (pagoData: TransaccionFormData): Promise<PagoVenta> => {
     try {
       console.log('➕ Registering pago for venta:', ventaId);
       
-      const transaccionData = {
-        tipo: 'PAGO_OBRA',
-        concepto: pagoData.concepto,
-        descripcion: pagoData.descripcion,
-        monto: pagoData.monto,
-        moneda: ventaData.moneda,
-        fecha: pagoData.fecha,
-        numeroComprobante: pagoData.numeroComprobante,
-        tipoComprobante: pagoData.tipoComprobante,
-        clienteId: ventaData.cliente.id,
-        pedidoId: ventaId,
-        medioPagoId: pagoData.medioPagoId
-      };
-
-      const nuevoPago = await api.post('/api/transacciones', transaccionData);
+      const nuevoPago = await api.post('/api/transacciones', pagoData);
       
       console.log('✅ Pago registered successfully:', nuevoPago.id);
       
@@ -169,11 +167,11 @@ export function usePagosVenta(ventaId: string | null) {
     }
   };
 
-  const actualizarEstadisticasConVenta = (totalVenta: number, saldoPendiente: number) => {
+  const actualizarEstadisticasConVenta = (ventaInfo: VentaInfo) => {
     setEstadisticas(prev => ({
       ...prev,
-      saldoPendiente,
-      porcentajeCobrado: totalVenta > 0 ? ((totalVenta - saldoPendiente) / totalVenta) * 100 : 0
+      saldoPendiente: ventaInfo.saldoPendiente,
+      porcentajeCobrado: ventaInfo.total > 0 ? ((ventaInfo.total - ventaInfo.saldoPendiente) / ventaInfo.total) * 100 : 0
     }));
   };
 
@@ -202,17 +200,9 @@ export function usePagosVenta(ventaId: string | null) {
     return Object.values(estadisticasPorMedio).sort((a, b) => b.monto - a.monto);
   };
 
-  const getProximoVencimiento = () => {
-    // Si hay condiciones de pago específicas, calcular próximo vencimiento
-    // Por ahora, retornamos null ya que no tenemos esa lógica implementada
-    return null;
-  };
-
   useEffect(() => {
     console.log('🔄 usePagosVenta effect triggered for venta:', ventaId);
-    if (ventaId) {
-      fetchPagos();
-    }
+    fetchPagos();
   }, [ventaId]);
 
   return {
@@ -225,8 +215,7 @@ export function usePagosVenta(ventaId: string | null) {
     anularPago,
     actualizarEstadisticasConVenta,
     getPagosDelPeriodo,
-    getEstadisticasPorMedioPago,
-    getProximoVencimiento
+    getEstadisticasPorMedioPago
   };
 }
 
@@ -251,14 +240,17 @@ export function useEstadisticasCobros() {
       console.log('📊 Fetching estadísticas de cobros...');
       
       // Obtener ventas con saldo pendiente
-      const ventasConSaldo = await api.get('/api/ventas?saldoPendiente=true');
+      const ventasConSaldo = await api.get('/api/ventas');
+      const ventasData = (ventasConSaldo.data || []).filter((venta: any) => 
+        Number(venta.saldoPendiente) > 0
+      );
       
-      const totalVentasConSaldo = ventasConSaldo.data?.length || 0;
-      const montoTotalPorCobrar = ventasConSaldo.data?.reduce((acc: number, venta: any) => 
-        acc + Number(venta.saldoPendiente), 0) || 0;
+      const totalVentasConSaldo = ventasData.length;
+      const montoTotalPorCobrar = ventasData.reduce((acc: number, venta: any) => 
+        acc + Number(venta.saldoPendiente), 0);
 
       // Ordenar por antigüedad para obtener las más atrasadas
-      const ventasMasAtrasadas = (ventasConSaldo.data || [])
+      const ventasMasAtrasadas = ventasData
         .sort((a: any, b: any) => new Date(a.fechaPedido).getTime() - new Date(b.fechaPedido).getTime())
         .slice(0, 5);
 
@@ -305,12 +297,12 @@ export function useAlertasCobros() {
     try {
       console.log('🚨 Fetching alertas de cobros...');
       
-      // Obtener ventas con saldo pendiente
-      const response = await api.get('/api/ventas?saldoPendiente=true');
-      const ventas = response.data || [];
+      const response = await api.get('/api/ventas');
+      const ventas = (response.data || []).filter((venta: any) => 
+        Number(venta.saldoPendiente) > 0
+      );
 
       const hoy = new Date();
-      const en7Dias = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       // Clasificar ventas según alertas
       const ventasVencidas = ventas.filter((venta: any) => {
