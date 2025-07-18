@@ -1,4 +1,4 @@
-// src/app/(auth)/ventas/nueva/page.tsx - MEJORADO PARA MANTENER TODOS LOS CAMPOS
+// src/app/(auth)/ventas/nueva/page.tsx - VERSIÓN EXPANDIDA CON MÁS CAMPOS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -24,7 +24,13 @@ import {
   HiOutlineClipboard,
   HiOutlineClock,
   HiOutlineEye,
-  HiOutlineExclamation
+  HiOutlineExclamation,
+  HiOutlineOfficeBuilding,
+  HiOutlinePhone,
+  HiOutlineMail,
+  HiOutlineLocationMarker,
+  HiOutlineCurrencyDollar,
+  HiOutlineClipboardList
 } from 'react-icons/hi';
 
 // Hook personalizado para presupuestos disponibles
@@ -50,7 +56,6 @@ function usePresupuestosDisponibles() {
         setEstadisticas(data.estadisticas || null);
         setDebug(data.debug || null);
         
-        // Log para debugging
         if (data.debug) {
           console.log('🔍 Debug info:', data.debug);
         }
@@ -205,7 +210,6 @@ function PresupuestoSelector({
             ))}
           </Select>
           
-          {/* Mensaje informativo si no hay presupuestos */}
           {!loading && presupuestos.length === 0 && (
             <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center">
@@ -337,6 +341,40 @@ export default function NuevaVentaPage() {
     }]
   });
 
+  // NUEVOS CAMPOS ADICIONALES
+  const [camposAdicionales, setCamposAdicionales] = useState({
+    // Información del proyecto
+    numeroProyecto: '',
+    tipoObra: '',
+    tiempoEntregaEstimado: '',
+    estadoInicial: 'PENDIENTE',
+    
+    // Contactos específicos del proyecto
+    contactoPrincipal: '',
+    telefonoContacto: '',
+    emailContacto: '',
+    
+    // Información de entrega
+    direccionEntrega: '',
+    horariosEntrega: '',
+    instruccionesEspeciales: '',
+    
+    // Información comercial
+    descuentoComercial: 0,
+    comision: 0,
+    garantia: '',
+    
+    // Documentación
+    requiereFactura: true,
+    tipoFactura: 'B',
+    requierePlanos: false,
+    requierePermisos: false,
+    
+    // Notas internas
+    notasInternas: '',
+    alertasEspeciales: ''
+  });
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPresupuesto, setSelectedPresupuesto] = useState<any>(null);
@@ -356,7 +394,7 @@ export default function NuevaVentaPage() {
         formData.impuestos
       );
 
-  // FUNCIÓN MEJORADA: Manejar selección de presupuesto manteniendo TODOS los campos
+  // Función mejorada para manejar selección de presupuesto
   const handlePresupuestoSelect = (presupuesto: any) => {
     console.log('📋 Seleccionando presupuesto completo:', presupuesto);
     
@@ -371,15 +409,24 @@ export default function NuevaVentaPage() {
       descripcionObra: presupuesto.descripcionObra || '',
       observaciones: presupuesto.observaciones || '',
       condicionesPago: presupuesto.condicionesPago || '',
-      tiempoEntrega: presupuesto.tiempoEntrega || '', // Si existe en el presupuesto
       moneda: presupuesto.moneda as 'PESOS' | 'DOLARES',
       descuento: Number(presupuesto.descuento) || 0,
       impuestos: Number(presupuesto.impuestos) || 0,
-      // Mantener fecha de entrega o calcular basada en tiempo de entrega
       fechaEntrega: presupuesto.tiempoEntrega ? 
         CalculationUtils.calcularFechaEntregaFromString(new Date(), presupuesto.tiempoEntrega) : 
         prev.fechaEntrega,
-      items: [] // Limpiar items ya que vienen del presupuesto
+      items: []
+    }));
+
+    // Copiar información adicional del presupuesto si está disponible
+    setCamposAdicionales(prev => ({
+      ...prev,
+      tiempoEntregaEstimado: presupuesto.tiempoEntrega || '',
+      contactoPrincipal: presupuesto.cliente.nombre || '',
+      telefonoContacto: presupuesto.cliente.telefono || '',
+      emailContacto: presupuesto.cliente.email || '',
+      numeroProyecto: `PROY-${presupuesto.numero}`,
+      garantia: presupuesto.tiempoEntrega || '30 días'
     }));
 
     console.log('✅ Presupuesto aplicado a la venta con todos los campos');
@@ -410,6 +457,29 @@ export default function NuevaVentaPage() {
         descuento: 0
       }]
     }));
+
+    // Limpiar campos adicionales
+    setCamposAdicionales({
+      numeroProyecto: '',
+      tipoObra: '',
+      tiempoEntregaEstimado: '',
+      estadoInicial: 'PENDIENTE',
+      contactoPrincipal: '',
+      telefonoContacto: '',
+      emailContacto: '',
+      direccionEntrega: '',
+      horariosEntrega: '',
+      instruccionesEspeciales: '',
+      descuentoComercial: 0,
+      comision: 0,
+      garantia: '',
+      requiereFactura: true,
+      tipoFactura: 'B',
+      requierePlanos: false,
+      requierePermisos: false,
+      notasInternas: '',
+      alertasEspeciales: ''
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -420,7 +490,9 @@ export default function NuevaVentaPage() {
     try {
       const dataToSubmit = {
         ...formData,
-        items: ventaDirecta ? formData.items : undefined
+        items: ventaDirecta ? formData.items : undefined,
+        // Agregar campos adicionales como observaciones extendidas
+        observaciones: `${formData.observaciones}${camposAdicionales.notasInternas ? `\n\nNotas internas: ${camposAdicionales.notasInternas}` : ''}${camposAdicionales.alertasEspeciales ? `\n\nAlertas especiales: ${camposAdicionales.alertasEspeciales}` : ''}`
       };
 
       const validatedData = ventaSchema.parse(dataToSubmit);
@@ -448,6 +520,10 @@ export default function NuevaVentaPage() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  const handleCampoAdicionalChange = (field: string, value: any) => {
+    setCamposAdicionales(prev => ({ ...prev, [field]: value }));
   };
 
   const addItem = () => {
@@ -566,7 +642,6 @@ export default function NuevaVentaPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Selector de presupuesto mejorado */}
             <PresupuestoSelector
               selectedId={selectedPresupuesto?.id || ''}
               onSelect={handlePresupuestoSelect}
@@ -576,29 +651,137 @@ export default function NuevaVentaPage() {
               debug={debug}
             />
 
-            <Select
-              label="Cliente *"
-              value={formData.clienteId}
-              onChange={(e) => handleChange('clienteId', e.target.value)}
-              error={errors.clienteId}
-              disabled={!!selectedPresupuesto}
-            >
-              <option value="">Seleccionar cliente</option>
-              {clients.map(client => (
-                <option key={client.id} value={client.id}>
-                  {client.nombre}
-                </option>
-              ))}
-            </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Cliente *"
+                value={formData.clienteId}
+                onChange={(e) => handleChange('clienteId', e.target.value)}
+                error={errors.clienteId}
+                disabled={!!selectedPresupuesto}
+              >
+                <option value="">Seleccionar cliente</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.nombre}
+                  </option>
+                ))}
+              </Select>
+
+              <Input
+                label="Número de Proyecto"
+                value={camposAdicionales.numeroProyecto}
+                onChange={(e) => handleCampoAdicionalChange('numeroProyecto', e.target.value)}
+                placeholder="Ej: PROY-2025-001"
+                disabled={!!selectedPresupuesto}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        {/* Detalles del pedido - SIEMPRE VISIBLE Y EDITABLE */}
+        {/* NUEVA SECCIÓN: Información del Proyecto */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <HiOutlineOfficeBuilding className="h-5 w-5 mr-2" />
+              Información del Proyecto
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Select
+                label="Tipo de Obra"
+                value={camposAdicionales.tipoObra}
+                onChange={(e) => handleCampoAdicionalChange('tipoObra', e.target.value)}
+              >
+                <option value="">Seleccionar tipo</option>
+                <option value="Ventanas">Ventanas</option>
+                <option value="Puertas">Puertas</option>
+                <option value="Frente Completo">Frente Completo</option>
+                <option value="Cerramiento">Cerramiento</option>
+                <option value="Mampara">Mampara</option>
+                <option value="Pérgola">Pérgola</option>
+                <option value="Reparación">Reparación</option>
+                <option value="Otro">Otro</option>
+              </Select>
+
+              <Select
+                label="Estado Inicial"
+                value={camposAdicionales.estadoInicial}
+                onChange={(e) => handleCampoAdicionalChange('estadoInicial', e.target.value)}
+              >
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="CONFIRMADO">Confirmado</option>
+                <option value="EN_PROCESO">En Proceso</option>
+              </Select>
+
+              <Input
+                label="Tiempo de Entrega Estimado"
+                value={camposAdicionales.tiempoEntregaEstimado}
+                onChange={(e) => handleCampoAdicionalChange('tiempoEntregaEstimado', e.target.value)}
+                placeholder="Ej: 15 días hábiles"
+                disabled={!!selectedPresupuesto}
+              />
+            </div>
+
+            <Input
+              label="Descripción de la Obra *"
+              value={formData.descripcionObra}
+              onChange={(e) => handleChange('descripcionObra', e.target.value)}
+              error={errors.descripcionObra}
+              placeholder="Describe el trabajo a realizar..."
+              disabled={!!selectedPresupuesto}
+            />
+
+            <Input
+              label="Garantía"
+              value={camposAdicionales.garantia}
+              onChange={(e) => handleCampoAdicionalChange('garantia', e.target.value)}
+              placeholder="Ej: 12 meses, 2 años"
+            />
+          </CardContent>
+        </Card>
+
+        {/* NUEVA SECCIÓN: Contactos del Proyecto */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <HiOutlinePhone className="h-5 w-5 mr-2" />
+              Contactos del Proyecto
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Input
+                label="Contacto Principal"
+                value={camposAdicionales.contactoPrincipal}
+                onChange={(e) => handleCampoAdicionalChange('contactoPrincipal', e.target.value)}
+                placeholder="Nombre del responsable"
+              />
+
+              <Input
+                label="Teléfono de Contacto"
+                value={camposAdicionales.telefonoContacto}
+                onChange={(e) => handleCampoAdicionalChange('telefonoContacto', e.target.value)}
+                placeholder="Ej: +54 11 1234-5678"
+              />
+
+              <Input
+                label="Email de Contacto"
+                type="email"
+                value={camposAdicionales.emailContacto}
+                onChange={(e) => handleCampoAdicionalChange('emailContacto', e.target.value)}
+                placeholder="contacto@empresa.com"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Fechas y configuración de entrega */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <HiOutlineCalendar className="h-5 w-5 mr-2" />
-              Detalles del Pedido
+              Fechas y Entrega
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -623,14 +806,46 @@ export default function NuevaVentaPage() {
               </Select>
             </div>
 
-            <Input
-              label="Descripción de la Obra *"
-              value={formData.descripcionObra}
-              onChange={(e) => handleChange('descripcionObra', e.target.value)}
-              error={errors.descripcionObra}
-              placeholder="Describe el trabajo a realizar..."
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Dirección de Entrega"
+                value={camposAdicionales.direccionEntrega}
+                onChange={(e) => handleCampoAdicionalChange('direccionEntrega', e.target.value)}
+                placeholder="Dirección completa donde se realizará la obra"
+              />
 
+              <Input
+                label="Horarios de Entrega"
+                value={camposAdicionales.horariosEntrega}
+                onChange={(e) => handleCampoAdicionalChange('horariosEntrega', e.target.value)}
+                placeholder="Ej: Lunes a Viernes 9-17hs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Instrucciones Especiales de Entrega
+              </label>
+              <textarea
+                value={camposAdicionales.instruccionesEspeciales}
+                onChange={(e) => handleCampoAdicionalChange('instruccionesEspeciales', e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Instrucciones especiales para la instalación o entrega..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* NUEVA SECCIÓN: Información Comercial */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <HiOutlineCurrencyDollar className="h-5 w-5 mr-2" />
+              Información Comercial
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Condiciones de Pago"
@@ -639,25 +854,93 @@ export default function NuevaVentaPage() {
                 placeholder="ej: 50% anticipo, 50% contra entrega"
               />
 
-              <Input
-                label="Lugar de Entrega"
-                value={formData.lugarEntrega}
-                onChange={(e) => handleChange('lugarEntrega', e.target.value)}
-                placeholder="Dirección de entrega"
-              />
+              <Select
+                label="Moneda"
+                value={formData.moneda}
+                onChange={(e) => handleChange('moneda', e.target.value)}
+                disabled={!!selectedPresupuesto}
+              >
+                <option value="PESOS">Pesos Argentinos</option>
+                <option value="DOLARES">Dólares</option>
+              </Select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observaciones
-              </label>
-              <textarea
-                value={formData.observaciones}
-                onChange={(e) => handleChange('observaciones', e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Información adicional del pedido..."
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Input
+                label="Descuento Comercial (%)"
+                type="number"
+                value={camposAdicionales.descuentoComercial}
+                onChange={(e) => handleCampoAdicionalChange('descuentoComercial', Number(e.target.value))}
+                min="0"
+                max="100"
               />
+
+              <Input
+                label="Comisión (%)"
+                type="number"
+                value={camposAdicionales.comision}
+                onChange={(e) => handleCampoAdicionalChange('comision', Number(e.target.value))}
+                min="0"
+                max="100"
+              />
+
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={camposAdicionales.requiereFactura}
+                    onChange={(e) => handleCampoAdicionalChange('requiereFactura', e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Requiere Factura</span>
+                </label>
+                {camposAdicionales.requiereFactura && (
+                  <Select
+                    label="Tipo de Factura"
+                    value={camposAdicionales.tipoFactura}
+                    onChange={(e) => handleCampoAdicionalChange('tipoFactura', e.target.value)}
+                  >
+                    <option value="A">Factura A</option>
+                    <option value="B">Factura B</option>
+                    <option value="C">Factura C</option>
+                  </Select>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* NUEVA SECCIÓN: Documentación y Permisos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <HiOutlineClipboardList className="h-5 w-5 mr-2" />
+              Documentación y Permisos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={camposAdicionales.requierePlanos}
+                    onChange={(e) => handleCampoAdicionalChange('requierePlanos', e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Requiere Planos</span>
+                </label>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={camposAdicionales.requierePermisos}
+                    onChange={(e) => handleCampoAdicionalChange('requierePermisos', e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Requiere Permisos Municipales</span>
+                </label>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -763,6 +1046,56 @@ export default function NuevaVentaPage() {
           </Card>
         )}
 
+        {/* NUEVA SECCIÓN: Notas y Observaciones */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <HiOutlineClipboard className="h-5 w-5 mr-2" />
+              Notas y Observaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observaciones del Cliente
+              </label>
+              <textarea
+                value={formData.observaciones}
+                onChange={(e) => handleChange('observaciones', e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Observaciones visibles para el cliente..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notas Internas
+              </label>
+              <textarea
+                value={camposAdicionales.notasInternas}
+                onChange={(e) => handleCampoAdicionalChange('notasInternas', e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Notas internas del equipo, no visibles para el cliente..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Alertas Especiales
+              </label>
+              <textarea
+                value={camposAdicionales.alertasEspeciales}
+                onChange={(e) => handleCampoAdicionalChange('alertasEspeciales', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Alertas importantes para el equipo de producción..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Totales y configuración final */}
         <Card>
           <CardHeader>
@@ -794,15 +1127,6 @@ export default function NuevaVentaPage() {
                       max="100"
                     />
                   </div>
-
-                  <Select
-                    label="Moneda"
-                    value={formData.moneda}
-                    onChange={(e) => handleChange('moneda', e.target.value)}
-                  >
-                    <option value="PESOS">Pesos Argentinos</option>
-                    <option value="DOLARES">Dólares</option>
-                  </Select>
                 </div>
               )}
 
@@ -826,6 +1150,12 @@ export default function NuevaVentaPage() {
                       <span>-{CurrencyUtils.formatAmount(totales.descuentoTotal, formData.moneda)}</span>
                     </div>
                   )}
+                  {camposAdicionales.descuentoComercial > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Desc. Comercial ({camposAdicionales.descuentoComercial}%):</span>
+                      <span>-{CurrencyUtils.formatAmount((totales.subtotal * camposAdicionales.descuentoComercial) / 100, formData.moneda)}</span>
+                    </div>
+                  )}
                   {totales.impuestos > 0 && (
                     <div className="flex justify-between">
                       <span>Impuestos:</span>
@@ -838,6 +1168,11 @@ export default function NuevaVentaPage() {
                       {CurrencyUtils.formatAmount(totales.total, formData.moneda)}
                     </span>
                   </div>
+                  {camposAdicionales.comision > 0 && (
+                    <div className="text-xs text-gray-500 text-right">
+                      Comisión ({camposAdicionales.comision}%): {CurrencyUtils.formatAmount((totales.total * camposAdicionales.comision) / 100, formData.moneda)}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
