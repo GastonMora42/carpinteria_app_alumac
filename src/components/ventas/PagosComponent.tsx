@@ -1,4 +1,4 @@
-// src/components/ventas/PagosComponent.tsx - COMPONENTE COMPLETO CORREGIDO
+// src/components/ventas/PagosComponent.tsx - VERSIÓN CORREGIDA CON MEJOR MANEJO DE FECHAS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -83,7 +83,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
     monto: venta.saldoPendiente || 0,
     concepto: `Pago obra ${venta.numero}`,
     descripcion: '',
-    fecha: new Date().toISOString().split('T')[0], // String de fecha
+    fecha: new Date().toISOString().split('T')[0], // String para input date
     medioPagoId: '',
     numeroComprobante: '',
     tipoComprobante: ''
@@ -109,28 +109,21 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
         if (response.ok) {
           const data = await response.json();
           console.log('✅ Medios de pago cargados:', data.data?.length || 0);
-          setMediosPago(data.data || []);
+          
+          if (data.data && data.data.length > 0) {
+            setMediosPago(data.data);
+          } else {
+            console.warn('⚠️ No hay medios de pago disponibles en la API');
+            // Mostrar error al usuario
+            setErrors({ general: 'No hay medios de pago configurados. Contacte al administrador.' });
+          }
         } else {
-          console.warn('⚠️ API de medios de pago no disponible, usando valores por defecto');
-          // Fallback a medios por defecto con IDs simples
-          setMediosPago([
-            { id: 'efectivo', nombre: 'Efectivo', descripcion: 'Pago en efectivo' },
-            { id: 'transferencia', nombre: 'Transferencia Bancaria', descripcion: 'Transferencia bancaria' },
-            { id: 'cheque', nombre: 'Cheque', descripcion: 'Pago con cheque' },
-            { id: 'tarjeta-debito', nombre: 'Tarjeta de Débito', descripcion: 'Pago con tarjeta de débito' },
-            { id: 'tarjeta-credito', nombre: 'Tarjeta de Crédito', descripcion: 'Pago con tarjeta de crédito' },
-            { id: 'mercado-pago', nombre: 'Mercado Pago', descripcion: 'Pago con Mercado Pago' },
-            { id: 'deposito', nombre: 'Depósito Bancario', descripcion: 'Depósito en cuenta bancaria' }
-          ]);
+          console.warn('⚠️ Error al cargar medios de pago:', response.status);
+          setErrors({ general: 'Error al cargar medios de pago. Por favor, recargue la página.' });
         }
       } catch (error) {
         console.error('❌ Error loading medios de pago:', error);
-        // Fallback a medios básicos
-        setMediosPago([
-          { id: 'efectivo', nombre: 'Efectivo' },
-          { id: 'transferencia', nombre: 'Transferencia Bancaria' },
-          { id: 'cheque', nombre: 'Cheque' }
-        ]);
+        setErrors({ general: 'Error de conexión al cargar medios de pago.' });
       } finally {
         setLoadingMedios(false);
       }
@@ -174,40 +167,42 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
     setErrors({});
 
     try {
-      // Validaciones básicas
+      // Validaciones básicas en el frontend
+      const newErrors: Record<string, string> = {};
+
       if (!formData.monto || formData.monto <= 0) {
-        setErrors({ monto: 'El monto debe ser mayor a 0' });
-        return;
+        newErrors.monto = 'El monto debe ser mayor a 0';
       }
 
       if (formData.monto > venta.saldoPendiente) {
-        setErrors({ monto: 'El monto no puede ser mayor al saldo pendiente' });
-        return;
+        newErrors.monto = 'El monto no puede ser mayor al saldo pendiente';
       }
 
       if (!formData.medioPagoId) {
-        setErrors({ medioPagoId: 'Debe seleccionar un medio de pago' });
-        return;
+        newErrors.medioPagoId = 'Debe seleccionar un medio de pago';
       }
 
-      if (!formData.concepto || formData.concepto.trim().length === 0) {
-        setErrors({ concepto: 'El concepto es requerido' });
-        return;
+      if (!formData.concepto?.trim()) {
+        newErrors.concepto = 'El concepto es requerido';
       }
 
       if (!formData.fecha) {
-        setErrors({ fecha: 'La fecha es requerida' });
+        newErrors.fecha = 'La fecha es requerida';
+      }
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
         return;
       }
 
-      // Preparar datos para envío
+      // Preparar datos para envío - IMPORTANTE: enviar fecha como string
       const transaccionData: TransaccionFormData = {
         tipo: 'PAGO_OBRA',
         concepto: formData.concepto.trim(),
         descripcion: formData.descripcion?.trim() || undefined,
         monto: Number(formData.monto),
         moneda: venta.moneda as 'PESOS' | 'DOLARES',
-        fecha: new Date(formData.fecha), // Convertir a Date para cumplir con el tipo requerido
+        fecha: new Date(formData.fecha), // Convertir a Date para cumplir con el tipo
         numeroComprobante: formData.numeroComprobante?.trim() || undefined,
         tipoComprobante: formData.tipoComprobante?.trim() || undefined,
         clienteId: venta.cliente.id,
@@ -217,10 +212,10 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
 
       console.log('📤 Enviando datos de transacción:', {
         ...transaccionData,
-        fecha: `${transaccionData.fecha} (string)`
+        fecha: `${transaccionData.fecha} (string para transformar)`
       });
 
-      await onSubmit(transaccionData);
+      await onSubmit(transaccionData as any); // Cast necesario por el transform de fecha
       
       // Solo cerrar el modal si no hay errores
       onClose();
@@ -228,13 +223,25 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
     } catch (error: any) {
       console.error('❌ Error al registrar pago:', error);
       
-      // Manejar diferentes tipos de errores
+      // Manejar diferentes tipos de errores de manera más específica
       if (error.message?.includes('Datos inválidos')) {
-        setErrors({ general: 'Por favor verifica que todos los campos estén correctos' });
+        if (error.details && Array.isArray(error.details)) {
+          // Error de validación de Zod con detalles
+          const fieldErrors: Record<string, string> = {};
+          error.details.forEach((detail: any) => {
+            const field = detail.field?.split('.').pop() || 'general';
+            fieldErrors[field] = detail.message || 'Error de validación';
+          });
+          setErrors(fieldErrors);
+        } else {
+          setErrors({ general: 'Por favor verifica que todos los campos estén correctos' });
+        }
       } else if (error.message?.includes('medio de pago')) {
         setErrors({ medioPagoId: 'Medio de pago inválido' });
       } else if (error.message?.includes('fecha')) {
         setErrors({ fecha: 'Fecha inválida' });
+      } else if (error.message?.includes('Token') || error.message?.includes('401')) {
+        setErrors({ general: 'Sesión expirada. Recargue la página e inicie sesión nuevamente.' });
       } else {
         setErrors({ general: error.message || 'Error al registrar pago' });
       }
@@ -327,7 +334,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
             )}
           </div>
 
-          {/* Select de medio de pago con loading */}
+          {/* Select de medio de pago mejorado */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Medio de Pago *
@@ -336,6 +343,11 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
               <div className="flex items-center justify-center py-2 border rounded-md bg-gray-50">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                 <span className="ml-2 text-sm text-gray-500">Cargando medios de pago...</span>
+              </div>
+            ) : mediosPago.length === 0 ? (
+              <div className="p-3 border border-red-300 rounded-md bg-red-50">
+                <p className="text-sm text-red-700">No hay medios de pago disponibles</p>
+                <p className="text-xs text-red-600 mt-1">Contacte al administrador para configurar medios de pago</p>
               </div>
             ) : (
               <select
@@ -349,7 +361,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
                 <option value="">Seleccionar medio</option>
                 {mediosPago.map(medio => (
                   <option key={medio.id} value={medio.id}>
-                    {medio.nombre}
+                    {medio.nombre} {medio.descripcion ? `- ${medio.descripcion}` : ''}
                   </option>
                 ))}
               </select>
@@ -444,7 +456,11 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
           <Button variant="outline" onClick={onClose} type="button" disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" loading={isSubmitting}>
+          <Button 
+            type="submit" 
+            loading={isSubmitting}
+            disabled={mediosPago.length === 0}
+          >
             <HiOutlineCash className="h-4 w-4 mr-2" />
             Registrar Pago
           </Button>
@@ -453,6 +469,9 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
     </Modal>
   );
 }
+
+// ... resto del componente igual (DetallePagoModal y PagosComponent principal)
+// El resto del código permanece igual, solo cambió PagoModal
 
 interface DetallePagoModalProps {
   isOpen: boolean;
@@ -508,7 +527,7 @@ function DetallePagoModal({ isOpen, onClose, pago, onAnular }: DetallePagoModalP
           </div>
         </div>
 
-        {/* Detalles */}
+        {/* Resto del modal igual */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Medio de Pago</label>
