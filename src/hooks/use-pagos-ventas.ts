@@ -1,5 +1,5 @@
-// src/hooks/use-pagos-ventas.ts - VERSIÓN CORREGIDA Y OPTIMIZADA
-import { useState, useEffect } from 'react';
+// src/hooks/use-pagos-ventas.ts - VERSIÓN CORREGIDA SIN CICLOS INFINITOS
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/utils/http';
 import { TransaccionFormData } from '@/lib/validations/transaccion';
 
@@ -59,7 +59,8 @@ export function usePagosVenta(ventaId: string | null) {
     pagoPromedio: 0
   });
 
-  const fetchPagos = async () => {
+  // Función estabilizada con useCallback para evitar recreaciones
+  const fetchPagos = useCallback(async () => {
     if (!ventaId) {
       setLoading(false);
       return;
@@ -84,7 +85,7 @@ export function usePagosVenta(ventaId: string | null) {
       const pagosData = data.data || [];
       setPagos(pagosData);
 
-      // Calcular estadísticas
+      // Calcular estadísticas de los pagos
       const totalPagos = pagosData.length;
       const montoCobrado = pagosData.reduce((acc: number, pago: PagoVenta) => acc + Number(pago.monto), 0);
       const ultimoPago = pagosData.length > 0 ? pagosData[0] : undefined;
@@ -110,9 +111,9 @@ export function usePagosVenta(ventaId: string | null) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ventaId]); // Solo ventaId como dependencia
 
-  const registrarPago = async (pagoData: TransaccionFormData): Promise<PagoVenta> => {
+  const registrarPago = useCallback(async (pagoData: TransaccionFormData): Promise<PagoVenta> => {
     try {
       console.log('➕ Registering pago for venta:', ventaId);
       
@@ -137,9 +138,9 @@ export function usePagosVenta(ventaId: string | null) {
       console.error('❌ Error registering pago:', err);
       throw new Error(err.message || 'Error al registrar pago');
     }
-  };
+  }, [ventaId]);
 
-  const anularPago = async (pagoId: string): Promise<void> => {
+  const anularPago = useCallback(async (pagoId: string): Promise<void> => {
     try {
       console.log('❌ Anulando pago:', pagoId);
       
@@ -165,24 +166,31 @@ export function usePagosVenta(ventaId: string | null) {
       console.error('❌ Error anulando pago:', err);
       throw new Error(err.message || 'Error al anular pago');
     }
-  };
+  }, [pagos]); // pagos como dependencia para acceder al estado actual
 
-  const actualizarEstadisticasConVenta = (ventaInfo: VentaInfo) => {
+  // FUNCIÓN ESTABILIZADA: Esta función ya no causa re-renders infinitos
+  const actualizarEstadisticasConVenta = useCallback((ventaInfo: VentaInfo) => {
+    console.log('📊 Actualizando estadísticas con info de venta:', {
+      total: ventaInfo.total,
+      totalCobrado: ventaInfo.totalCobrado,
+      saldoPendiente: ventaInfo.saldoPendiente
+    });
+
     setEstadisticas(prev => ({
       ...prev,
       saldoPendiente: ventaInfo.saldoPendiente,
       porcentajeCobrado: ventaInfo.total > 0 ? ((ventaInfo.total - ventaInfo.saldoPendiente) / ventaInfo.total) * 100 : 0
     }));
-  };
+  }, []); // Sin dependencias porque solo actualiza con los datos pasados como parámetro
 
-  const getPagosDelPeriodo = (fechaInicio: Date, fechaFin: Date): PagoVenta[] => {
+  const getPagosDelPeriodo = useCallback((fechaInicio: Date, fechaFin: Date): PagoVenta[] => {
     return pagos.filter(pago => {
       const fechaPago = new Date(pago.fecha);
       return fechaPago >= fechaInicio && fechaPago <= fechaFin;
     });
-  };
+  }, [pagos]);
 
-  const getEstadisticasPorMedioPago = () => {
+  const getEstadisticasPorMedioPago = useCallback(() => {
     const estadisticasPorMedio = pagos.reduce((acc, pago) => {
       const medio = pago.medioPago.nombre;
       if (!acc[medio]) {
@@ -198,12 +206,13 @@ export function usePagosVenta(ventaId: string | null) {
     }, {} as Record<string, { nombre: string; cantidad: number; monto: number }>);
 
     return Object.values(estadisticasPorMedio).sort((a, b) => b.monto - a.monto);
-  };
+  }, [pagos]);
 
+  // Efecto principal que solo se ejecuta cuando cambia ventaId
   useEffect(() => {
     console.log('🔄 usePagosVenta effect triggered for venta:', ventaId);
     fetchPagos();
-  }, [ventaId]);
+  }, [fetchPagos]); // fetchPagos ya está estabilizado con useCallback
 
   return {
     pagos,
@@ -213,7 +222,7 @@ export function usePagosVenta(ventaId: string | null) {
     refetch: fetchPagos,
     registrarPago,
     anularPago,
-    actualizarEstadisticasConVenta,
+    actualizarEstadisticasConVenta, // Esta función ya no causa re-renders
     getPagosDelPeriodo,
     getEstadisticasPorMedioPago
   };
@@ -235,7 +244,7 @@ export function useEstadisticasCobros() {
     loading: true
   });
 
-  const fetchEstadisticas = async () => {
+  const fetchEstadisticas = useCallback(async () => {
     try {
       console.log('📊 Fetching estadísticas de cobros...');
       
@@ -267,11 +276,11 @@ export function useEstadisticasCobros() {
       console.error('❌ Error fetching estadísticas de cobros:', err);
       setEstadisticas(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchEstadisticas();
-  }, []);
+  }, [fetchEstadisticas]);
 
   return {
     ...estadisticas,
@@ -293,7 +302,7 @@ export function useAlertasCobros() {
     loading: true
   });
 
-  const fetchAlertas = async () => {
+  const fetchAlertas = useCallback(async () => {
     try {
       console.log('🚨 Fetching alertas de cobros...');
       
@@ -337,7 +346,7 @@ export function useAlertasCobros() {
       console.error('❌ Error fetching alertas de cobros:', err);
       setAlertas(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAlertas();
@@ -346,7 +355,7 @@ export function useAlertasCobros() {
     const interval = setInterval(fetchAlertas, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchAlertas]);
 
   return {
     ...alertas,
