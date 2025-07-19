@@ -1,7 +1,7 @@
-// src/components/ventas/PagosComponent.tsx - COMPONENTE REUTILIZABLE PARA PAGOS
+// src/components/ventas/PagosComponent.tsx - COMPONENTE COMPLETO CORREGIDO
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow } from '@/components/ui/table';
@@ -55,6 +55,12 @@ interface VentaInfo {
   };
 }
 
+interface MedioPago {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+}
+
 interface PagosComponentProps {
   venta: VentaInfo;
   pagos: Pago[];
@@ -77,23 +83,79 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
     monto: venta.saldoPendiente || 0,
     concepto: `Pago obra ${venta.numero}`,
     descripcion: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: new Date().toISOString().split('T')[0], // String de fecha
     medioPagoId: '',
     numeroComprobante: '',
     tipoComprobante: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Estados para medios de pago
+  const [mediosPago, setMediosPago] = useState<MedioPago[]>([]);
+  const [loadingMedios, setLoadingMedios] = useState(true);
 
-  const mediosPago = [
-    { id: '1', nombre: 'Efectivo' },
-    { id: '2', nombre: 'Transferencia Bancaria' },
-    { id: '3', nombre: 'Cheque' },
-    { id: '4', nombre: 'Tarjeta de Débito' },
-    { id: '5', nombre: 'Tarjeta de Crédito' },
-    { id: '6', nombre: 'Mercado Pago' },
-    { id: '7', nombre: 'Depósito Bancario' }
-  ];
+  // Cargar medios de pago desde la API
+  useEffect(() => {
+    const fetchMediosPago = async () => {
+      try {
+        setLoadingMedios(true);
+        console.log('🏦 Cargando medios de pago...');
+        
+        const response = await fetch('/api/medios-pago', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Medios de pago cargados:', data.data?.length || 0);
+          setMediosPago(data.data || []);
+        } else {
+          console.warn('⚠️ API de medios de pago no disponible, usando valores por defecto');
+          // Fallback a medios por defecto con IDs simples
+          setMediosPago([
+            { id: 'efectivo', nombre: 'Efectivo', descripcion: 'Pago en efectivo' },
+            { id: 'transferencia', nombre: 'Transferencia Bancaria', descripcion: 'Transferencia bancaria' },
+            { id: 'cheque', nombre: 'Cheque', descripcion: 'Pago con cheque' },
+            { id: 'tarjeta-debito', nombre: 'Tarjeta de Débito', descripcion: 'Pago con tarjeta de débito' },
+            { id: 'tarjeta-credito', nombre: 'Tarjeta de Crédito', descripcion: 'Pago con tarjeta de crédito' },
+            { id: 'mercado-pago', nombre: 'Mercado Pago', descripcion: 'Pago con Mercado Pago' },
+            { id: 'deposito', nombre: 'Depósito Bancario', descripcion: 'Depósito en cuenta bancaria' }
+          ]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading medios de pago:', error);
+        // Fallback a medios básicos
+        setMediosPago([
+          { id: 'efectivo', nombre: 'Efectivo' },
+          { id: 'transferencia', nombre: 'Transferencia Bancaria' },
+          { id: 'cheque', nombre: 'Cheque' }
+        ]);
+      } finally {
+        setLoadingMedios(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchMediosPago();
+    }
+  }, [isOpen]);
+
+  // Reset form cuando se abre el modal
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        monto: venta.saldoPendiente || 0,
+        concepto: `Pago obra ${venta.numero}`,
+        descripcion: '',
+        fecha: new Date().toISOString().split('T')[0],
+        medioPagoId: '',
+        numeroComprobante: '',
+        tipoComprobante: ''
+      });
+      setErrors({});
+    }
+  }, [isOpen, venta.saldoPendiente, venta.numero]);
 
   const tiposComprobante = [
     'Recibo',
@@ -113,7 +175,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
 
     try {
       // Validaciones básicas
-      if (formData.monto <= 0) {
+      if (!formData.monto || formData.monto <= 0) {
         setErrors({ monto: 'El monto debe ser mayor a 0' });
         return;
       }
@@ -128,36 +190,54 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
         return;
       }
 
+      if (!formData.concepto || formData.concepto.trim().length === 0) {
+        setErrors({ concepto: 'El concepto es requerido' });
+        return;
+      }
+
+      if (!formData.fecha) {
+        setErrors({ fecha: 'La fecha es requerida' });
+        return;
+      }
+
+      // Preparar datos para envío
       const transaccionData: TransaccionFormData = {
         tipo: 'PAGO_OBRA',
-        concepto: formData.concepto,
-        descripcion: formData.descripcion,
+        concepto: formData.concepto.trim(),
+        descripcion: formData.descripcion?.trim() || undefined,
         monto: Number(formData.monto),
         moneda: venta.moneda as 'PESOS' | 'DOLARES',
-        fecha: new Date(formData.fecha),
-        numeroComprobante: formData.numeroComprobante,
-        tipoComprobante: formData.tipoComprobante,
+        fecha: new Date(formData.fecha), // Convertir a Date para cumplir con el tipo requerido
+        numeroComprobante: formData.numeroComprobante?.trim() || undefined,
+        tipoComprobante: formData.tipoComprobante?.trim() || undefined,
         clienteId: venta.cliente.id,
         pedidoId: venta.id,
         medioPagoId: formData.medioPagoId
       };
 
+      console.log('📤 Enviando datos de transacción:', {
+        ...transaccionData,
+        fecha: `${transaccionData.fecha} (string)`
+      });
+
       await onSubmit(transaccionData);
+      
+      // Solo cerrar el modal si no hay errores
       onClose();
       
-      // Reset form
-      setFormData({
-        monto: venta.saldoPendiente - formData.monto, // Actualizar con nuevo saldo
-        concepto: `Pago obra ${venta.numero}`,
-        descripcion: '',
-        fecha: new Date().toISOString().split('T')[0],
-        medioPagoId: '',
-        numeroComprobante: '',
-        tipoComprobante: ''
-      });
     } catch (error: any) {
-      console.error('Error al registrar pago:', error);
-      setErrors({ general: error.message || 'Error al registrar pago' });
+      console.error('❌ Error al registrar pago:', error);
+      
+      // Manejar diferentes tipos de errores
+      if (error.message?.includes('Datos inválidos')) {
+        setErrors({ general: 'Por favor verifica que todos los campos estén correctos' });
+      } else if (error.message?.includes('medio de pago')) {
+        setErrors({ medioPagoId: 'Medio de pago inválido' });
+      } else if (error.message?.includes('fecha')) {
+        setErrors({ fecha: 'Fecha inválida' });
+      } else {
+        setErrors({ general: error.message || 'Error al registrar pago' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -247,18 +327,37 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
             )}
           </div>
 
-          <Select
-            label="Medio de Pago *"
-            value={formData.medioPagoId}
-            onChange={(e) => setFormData(prev => ({ ...prev, medioPagoId: e.target.value }))}
-            error={errors.medioPagoId}
-            required
-          >
-            <option value="">Seleccionar medio</option>
-            {mediosPago.map(medio => (
-              <option key={medio.id} value={medio.id}>{medio.nombre}</option>
-            ))}
-          </Select>
+          {/* Select de medio de pago con loading */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Medio de Pago *
+            </label>
+            {loadingMedios ? (
+              <div className="flex items-center justify-center py-2 border rounded-md bg-gray-50">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-gray-500">Cargando medios de pago...</span>
+              </div>
+            ) : (
+              <select
+                value={formData.medioPagoId}
+                onChange={(e) => setFormData(prev => ({ ...prev, medioPagoId: e.target.value }))}
+                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.medioPagoId ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
+                }`}
+                required
+              >
+                <option value="">Seleccionar medio</option>
+                {mediosPago.map(medio => (
+                  <option key={medio.id} value={medio.id}>
+                    {medio.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.medioPagoId && (
+              <p className="mt-1 text-sm text-red-600">{errors.medioPagoId}</p>
+            )}
+          </div>
 
           <Input
             label="Fecha de Pago *"
@@ -266,6 +365,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
             value={formData.fecha}
             onChange={(e) => setFormData(prev => ({ ...prev, fecha: e.target.value }))}
             max={new Date().toISOString().split('T')[0]}
+            error={errors.fecha}
             required
           />
 
@@ -293,6 +393,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
           value={formData.concepto}
           onChange={(e) => setFormData(prev => ({ ...prev, concepto: e.target.value }))}
           placeholder="Describe el concepto del pago"
+          error={errors.concepto}
           required
         />
 
@@ -340,7 +441,7 @@ function PagoModal({ isOpen, onClose, venta, onSubmit }: PagoModalProps) {
         )}
 
         <div className="flex justify-end space-x-3 pt-6 border-t">
-          <Button variant="outline" onClick={onClose} type="button">
+          <Button variant="outline" onClick={onClose} type="button" disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button type="submit" loading={isSubmitting}>
@@ -640,6 +741,7 @@ export function PagosComponent({
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">Cargando pagos...</span>
             </div>
           ) : pagos.length === 0 ? (
             <div className="text-center py-12">
