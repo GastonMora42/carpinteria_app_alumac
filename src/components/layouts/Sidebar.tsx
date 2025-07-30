@@ -56,7 +56,8 @@ const navigation = [
       { name: 'Transacciones', href: '/finanzas/transacciones' },
       { name: 'Cheques', href: '/finanzas/cheques' },
       { name: 'Saldos por Cobrar', href: '/finanzas/saldos' },
-      { name: 'Gastos Generales', href: '/finanzas/gastos' }
+      { name: 'Gastos Generales', href: '/finanzas/gastos' },
+      { name: 'Análisis de Márgenes', href: '/finanzas/margenes' }
     ]
   },
   { 
@@ -66,7 +67,6 @@ const navigation = [
     submenu: [
       { name: 'Catálogo', href: '/materiales' },
       { name: 'Proveedores', href: '/materiales/proveedores' },
-      { name: 'Nuevo Material', href: '/materiales/nuevo' }
     ]
   },
   { 
@@ -76,7 +76,6 @@ const navigation = [
     submenu: [
       { name: 'Stock Actual', href: '/inventario' },
       { name: 'Movimientos', href: '/inventario/movimientos' },
-      { name: 'Stock Mínimo', href: '/inventario/alertas' }
     ]
   },
   { 
@@ -87,7 +86,6 @@ const navigation = [
       { name: 'Dashboard Ejecutivo', href: '/reportes' },
       { name: 'Rendimiento por Obra', href: '/reportes/rendimiento' },
       { name: 'Análisis Financiero', href: '/reportes/financiero' },
-      { name: 'Exportar Datos', href: '/reportes/exportar' }
     ]
   },
 ];
