@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
         data: { 
           stockActual: Number(material.stockActual) + Number(validatedData.cantidad),
           // Actualizar precio si es diferente
-          ...(validatedData.precioUnitario !== material.precioUnitario && {
+          ...(validatedData.precioUnitario !== Number(material.precioUnitario) && {
             precioUnitario: validatedData.precioUnitario
           })
         }
