@@ -1,4 +1,4 @@
-// src/components/layouts/Sidebar.tsx - ACTUALIZADO CON LOGO
+// src/components/layouts/Sidebar.tsx - ACTUALIZADO CON NUEVAS PÁGINAS
 'use client';
 
 import Link from 'next/link';
@@ -15,7 +15,11 @@ import {
   HiOutlineCog,
   HiOutlineCreditCard,
   HiOutlineCollection,
-  HiOutlineTruck
+  HiOutlineTruck,
+  HiOutlineCalendar,
+  HiOutlineShoppingCart,
+  HiOutlineClock,
+  HiOutlineOfficeBuilding
 } from 'react-icons/hi';
 
 const navigation = [
@@ -37,6 +41,16 @@ const navigation = [
     submenu: [
       { name: 'Todos', href: '/presupuestos' },
       { name: 'Nuevo Presupuesto', href: '/presupuestos/nuevo' },
+    ]
+  },
+  { 
+    name: 'Obras', 
+    href: '/obras', 
+    icon: HiOutlineOfficeBuilding,
+    submenu: [
+      { name: 'Cronograma', href: '/obras/cronograma' },
+      { name: 'Seguimiento', href: '/obras/seguimiento' },
+      { name: 'Entregas', href: '/obras/entregas' }
     ]
   },
   { 
@@ -66,6 +80,7 @@ const navigation = [
     icon: HiOutlineCollection,
     submenu: [
       { name: 'Catálogo', href: '/materiales' },
+      { name: 'Compras', href: '/materiales/compras' },
       { name: 'Proveedores', href: '/materiales/proveedores' },
     ]
   },

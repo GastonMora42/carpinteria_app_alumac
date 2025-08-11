@@ -1,4 +1,4 @@
-// src/hooks/use-compras-materiales.ts
+// src/hooks/use-compras-materiales.ts - HOOK CORREGIDO
 import { useState, useEffect } from 'react';
 import { CompraMaterialFormData } from '@/lib/validations/compra-material';
 import { api } from '@/lib/utils/http';
@@ -237,13 +237,16 @@ export function useCompraMaterial(id: string | null) {
   return { compra, loading, error };
 }
 
-// Hook para estadísticas de compras
+// Hook para estadísticas de compras - CORREGIDO CON TODAS LAS PROPIEDADES
 export function useEstadisticasCompras() {
   const [estadisticas, setEstadisticas] = useState<{
     totalCompras: number;
     montoTotalCompras: number;
     comprasPendientesPago: number;
     montoPendientePago: number;
+    comprasEsteAño: number;
+    pagosProximosVencer: number;
+    pagosVencidos: number; // ✅ AGREGADO
     comprasPorMes: Array<{
       mes: string;
       cantidad: number;
@@ -251,13 +254,17 @@ export function useEstadisticasCompras() {
     }>;
     materialesMasComprados: Array<{
       material: string;
-      cantidad: number;
-      monto: number;
+      codigo: string;
+      cantidadCompras: number;
+      cantidadTotal: number;
+      montoTotal: number;
     }>;
     proveedoresPrincipales: Array<{
       proveedor: string;
+      codigo: string;
       compras: number;
-      monto: number;
+      montoTotal: number;
+      promedioCompra: number;
     }>;
     loading: boolean;
   }>({
@@ -265,6 +272,9 @@ export function useEstadisticasCompras() {
     montoTotalCompras: 0,
     comprasPendientesPago: 0,
     montoPendientePago: 0,
+    comprasEsteAño: 0,
+    pagosProximosVencer: 0,
+    pagosVencidos: 0, // ✅ INICIALIZADO
     comprasPorMes: [],
     materialesMasComprados: [],
     proveedoresPrincipales: [],
@@ -280,7 +290,16 @@ export function useEstadisticasCompras() {
       console.log('✅ Estadísticas de compras fetched successfully');
       
       setEstadisticas({
-        ...data,
+        totalCompras: data.totalCompras || 0,
+        montoTotalCompras: data.montoTotalCompras || 0,
+        comprasPendientesPago: data.comprasPendientesPago || 0,
+        montoPendientePago: data.montoPendientePago || 0,
+        comprasEsteAño: data.comprasEsteAño || 0,
+        pagosProximosVencer: data.pagosProximosVencer || 0,
+        pagosVencidos: data.pagosVencidos || 0, // ✅ MAPEADO CORRECTAMENTE
+        comprasPorMes: data.comprasPorMes || [],
+        materialesMasComprados: data.materialesMasComprados || [],
+        proveedoresPrincipales: data.proveedoresPrincipales || [],
         loading: false
       });
     } catch (err: any) {
