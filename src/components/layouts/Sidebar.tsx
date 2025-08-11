@@ -43,16 +43,8 @@ const navigation = [
       { name: 'Nuevo Presupuesto', href: '/presupuestos/nuevo' },
     ]
   },
-  { 
-    name: 'Obras', 
-    href: '/obras', 
-    icon: HiOutlineOfficeBuilding,
-    submenu: [
-      { name: 'Cronograma', href: '/obras/cronograma' },
-      { name: 'Seguimiento', href: '/obras/seguimiento' },
-      { name: 'Entregas', href: '/obras/entregas' }
-    ]
-  },
+  { name: 'Fechas Obras', href: '/obras/cronograma', icon: HiOutlineOfficeBuilding },
+
   { 
     name: 'Clientes', 
     href: '/clientes', 
